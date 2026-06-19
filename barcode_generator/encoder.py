@@ -25,6 +25,12 @@ REQUIRED_FIELDS = ("license_number", "last_name", "first_name", "dob")
 def build_encoded_text(data):
     lines = []
     for prefix, key in FIELD_ORDER:
-        val = data.get(key, "") or ""
+        val = data.get(key)
+        if val is None:
+            val = "NONE"
+        else:
+            val = str(val).strip()
+            if not val:
+                val = "NONE"
         lines.append(f"{prefix} {val}")
     return "\n".join(lines)
