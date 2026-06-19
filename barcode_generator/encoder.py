@@ -26,5 +26,5 @@ def build_encoded_text(data):
     lines = []
     for prefix, key in FIELD_ORDER:
         val = data.get(key, "") or ""
-        lines.append(f"{prefix}: {val}")
+        lines.append(f"{prefix} {val}")
     return "\n".join(lines)
