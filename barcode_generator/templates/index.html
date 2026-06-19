@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF417 Barcode Generator</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+    <header>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1a3a6b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 5v14M6 5v14M10 5v14M14 5v14M17 5v14M21 5v14"/>
+            </svg>
+            <h1>PDF417 Barcode Generator</h1>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Form Section -->
+        <section class="card">
+            <h2>Identity Details</h2>
+            <form action="/generate" method="POST" id="form">
+                <div class="form-grid">
+                    <!-- Licence Number -->
+                    <div class="form-group col-span-2">
+                        <label for="license_number">Licence Number *</label>
+                        <input type="text" id="license_number" name="license_number" required placeholder="DL-XXXX-XXXX" value="{{ data.license_number if data else '' }}">
+                    </div>
+
+                    <!-- First Name -->
+                    <div class="form-group">
+                        <label for="first_name">First Name *</label>
+                        <input type="text" id="first_name" name="first_name" required value="{{ data.first_name if data else '' }}">
+                    </div>
+
+                    <!-- Last Name -->
+                    <div class="form-group">
+                        <label for="last_name">Last Name *</label>
+                        <input type="text" id="last_name" name="last_name" required value="{{ data.last_name if data else '' }}">
+                    </div>
+
+                    <!-- Middle Name -->
+                    <div class="form-group">
+                        <label for="middle_name">Middle Name</label>
+                        <input type="text" id="middle_name" name="middle_name" value="{{ data.middle_name if data else '' }}">
+                    </div>
+
+                    <!-- Date of Birth -->
+                    <div class="form-group">
+                        <label for="dob">Date of Birth *</label>
+                        <input type="date" id="dob" name="dob" required value="{{ data.dob if data else '' }}">
+                    </div>
+
+                    <!-- Issue Date -->
+                    <div class="form-group">
+                        <label for="issue_date">Issue Date</label>
+                        <input type="date" id="issue_date" name="issue_date" value="{{ data.issue_date if data else '' }}">
+                    </div>
+
+                    <!-- Expiry Date -->
+                    <div class="form-group">
+                        <label for="expiry_date">Expiry Date</label>
+                        <input type="date" id="expiry_date" name="expiry_date" value="{{ data.expiry_date if data else '' }}">
+                    </div>
+
+                    <!-- Address -->
+                    <div class="form-group col-span-2">
+                        <label for="address">Address</label>
+                        <input type="text" id="address" name="address" placeholder="Street Address, P.O. Box" value="{{ data.address if data else '' }}">
+                    </div>
+
+                    <!-- City -->
+                    <div class="form-group">
+                        <label for="city">City</label>
+                        <input type="text" id="city" name="city" value="{{ data.city if data else '' }}">
+                    </div>
+
+                    <!-- County -->
+                    <div class="form-group">
+                        <label for="county">County</label>
+                        <input type="text" id="county" name="county" value="{{ data.county if data else '' }}">
+                    </div>
+
+                    <!-- ZIP / Postal Code -->
+                    <div class="form-group">
+                        <label for="zip">ZIP / Postal Code</label>
+                        <input type="text" id="zip" name="zip" value="{{ data.zip if data else '' }}">
+                    </div>
+
+                    <!-- Country -->
+                    <div class="form-group">
+                        <label for="country">Country</label>
+                        <input type="text" id="country" name="country" value="{{ data.country if data else (data.country or 'KENYA') }}">
+                    </div>
+
+                    <!-- Sex -->
+                    <div class="form-group">
+                        <label for="sex">Sex</label>
+                        <select id="sex" name="sex">
+                            <option value="M" {% if data and data.sex == 'M' %}selected{% endif %}>M</option>
+                            <option value="F" {% if data and data.sex == 'F' %}selected{% endif %}>F</option>
+                        </select>
+                    </div>
+
+                    <!-- Height -->
+                    <div class="form-group">
+                        <label for="height">Height</label>
+                        <input type="text" id="height" name="height" value="{{ data.height if data else '5\'11\"' }}">
+                    </div>
+
+                    <!-- Eye Color -->
+                    <div class="form-group">
+                        <label for="eye_color">Eye Color</label>
+                        <select id="eye_color" name="eye_color">
+                            <option value="BRN" {% if data and data.eye_color == 'BRN' %}selected{% endif %}>BRN</option>
+                            <option value="BLU" {% if data and data.eye_color == 'BLU' %}selected{% endif %}>BLU</option>
+                            <option value="GRN" {% if data and data.eye_color == 'GRN' %}selected{% endif %}>GRN</option>
+                            <option value="HZL" {% if data and data.eye_color == 'HZL' %}selected{% endif %}>HZL</option>
+                            <option value="GRY" {% if data and data.eye_color == 'GRY' %}selected{% endif %}>GRY</option>
+                        </select>
+                    </div>
+
+                    <!-- Hair Color -->
+                    <div class="form-group">
+                        <label for="hair_color">Hair Color</label>
+                        <select id="hair_color" name="hair_color">
+                            <option value="BLK" {% if data and data.hair_color == 'BLK' %}selected{% endif %}>BLK</option>
+                            <option value="BRN" {% if data and data.hair_color == 'BRN' %}selected{% endif %}>BRN</option>
+                            <option value="BLD" {% if data and data.hair_color == 'BLD' %}selected{% endif %}>BLD</option>
+                            <option value="RED" {% if data and data.hair_color == 'RED' %}selected{% endif %}>RED</option>
+                            <option value="GRY" {% if data and data.hair_color == 'GRY' %}selected{% endif %}>GRY</option>
+                        </select>
+                    </div>
+
+                    <!-- Category -->
+                    <div class="form-group col-span-2">
+                        <label for="category">Category</label>
+                        <input type="text" id="category" name="category" value="{{ data.category if data else 'STUDENT' }}">
+                    </div>
+
+                    <!-- Restrictions -->
+                    <div class="form-group col-span-2">
+                        <label for="restrictions">Restrictions</label>
+                        <input type="text" id="restrictions" name="restrictions" value="{{ data.restrictions if data else 'NONE' }}">
+                    </div>
+
+                    <!-- Endorsements -->
+                    <div class="form-group col-span-2">
+                        <label for="endorsements">Endorsements</label>
+                        <input type="text" id="endorsements" name="endorsements" value="{{ data.endorsements if data else 'NONE' }}">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-generate">
+                    <span style="vertical-align: middle; margin-right: 8px;">🔄</span> Generate PDF417 Barcode
+                </button>
+            </form>
+        </section>
+
+        <!-- Preview Section -->
+        <section class="preview-container">
+            <h2 style="align-self: flex-start; width: 100%;">Live Preview</h2>
+            
+            <div class="barcode-box">
+                {% if generated %}
+                    <img id="barcodeImage" src="/barcode_layout.png" alt="PDF417 Barcode">
+                {% else %}
+                    <div class="fallback-placeholder">
+                        <span style="font-size: 36px; margin-bottom: 8px;">📊</span>
+                        Awaiting Generation...
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="info-banner">
+                ℹ️ Standard PDF417 encoding optimized for institutional license readers and state-level compliance verification.
+            </div>
+
+            <div class="actions-grid">
+                <button type="button" class="btn-action btn-print" onclick="window.print()" {% if not generated %}disabled{% endif %}>
+                    Print Record
+                </button>
+                <a href="/barcode_layout.png" download="barcode_layout.png" class="btn-action btn-download" style="text-align: center; border-color: #c4c6d0;" {% if not generated %}style="pointer-events: none; opacity: 0.5;"{% endif %}>
+                    Save PNG
+                </a>
+            </div>
+        </section>
+    </main>
+
+    {% if generated %}
+    <!-- Print Area -->
+    <div id="barcodePrintSection" style="display: none;">
+        <img src="/barcode_layout.png" style="width: 100%; max-width: 600px; height: auto;" alt="PDF417 Barcode">
+    </div>
+    {% endif %}
+
+</body>
+</html>

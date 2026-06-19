@@ -1,0 +1,6 @@
+{
+  "name": "PDF417 Barcode Generator",
+  "description": "A high-resolution PDF417 barcode utility generator with institutional layout options, form formatting, live preview downloads, and printing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

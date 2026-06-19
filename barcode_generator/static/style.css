@@ -1,0 +1,233 @@
+body {
+    background-color: #f8f9fa;
+    color: #191c1d;
+    font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+header {
+    background-color: #ffffff;
+    border-bottom: 1px solid #e1e3e4;
+    padding: 16px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+header h1 {
+    color: #1a3a6b;
+    font-size: 24px;
+    font-weight: bold;
+    margin: 0;
+}
+
+.main-container {
+    max-width: 1200px;
+    margin: 40px auto;
+    padding: 0 16px;
+    display: grid;
+    grid-template-columns: 7fr 5fr;
+    gap: 24px;
+}
+
+@media (max-width: 992px) {
+    .main-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+.card {
+    background-color: #ffffff;
+    border: 1px solid #c4c6d0;
+    border-radius: 4px;
+    padding: 32px;
+}
+
+.card h2 {
+    color: #1a3a6b;
+    font-size: 20px;
+    border-bottom: 1px solid #c4c6d0;
+    padding-bottom: 12px;
+    margin-top: 0;
+    margin-bottom: 24px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+@media (max-width: 576px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.col-span-2 {
+    grid-column: span 2;
+}
+
+@media (max-width: 576px) {
+    .col-span-2 {
+        grid-column: span 1;
+    }
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.form-group label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #43474f;
+}
+
+.form-group input, .form-group select {
+    border: 1px solid #c4c6d0;
+    padding: 12px;
+    font-size: 16px;
+    background-color: #ffffff;
+    border-radius: 4px;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.form-group input:focus, .form-group select:focus {
+    border-color: #1a3a6b;
+    box-shadow: 0 0 0 2px rgba(26, 58, 107, 0.15);
+}
+
+.btn-generate {
+    background-color: #1a3a6b;
+    color: #ffffff;
+    border: none;
+    font-size: 18px;
+    font-weight: bold;
+    padding: 16px;
+    cursor: pointer;
+    width: 100%;
+    border-radius: 4px;
+    margin-top: 16px;
+    transition: all 0.2s;
+}
+
+.btn-generate:hover {
+    background-color: #002451;
+}
+
+.btn-generate:active {
+    transform: scale(0.99);
+}
+
+.preview-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border: 1px solid #c4c6d0;
+    padding: 32px;
+    background-color: #ffffff;
+    border-radius: 4px;
+}
+
+.barcode-box {
+    width: 100%;
+    border: 1px solid #c4c6d0;
+    background-color: #ffffff;
+    box-sizing: border-box;
+    aspect-ratio: 3/1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    margin-bottom: 24px;
+}
+
+.barcode-box img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.fallback-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: #747780;
+    font-size: 14px;
+}
+
+.actions-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    width: 100%;
+}
+
+.btn-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.btn-print {
+    border: 1px solid #1a3a6b;
+    background-color: transparent;
+    color: #1a3a6b;
+}
+
+.btn-print:hover {
+    background-color: rgba(26, 58, 107, 0.05);
+}
+
+.btn-download {
+    border: 1px solid #c4c6d0;
+    background-color: #ffffff;
+    color: #43474f;
+}
+
+.btn-download:hover {
+    background-color: #f3f4f5;
+}
+
+.info-banner {
+    padding: 16px;
+    background-color: #f3f4f5;
+    border-left: 4px solid #1a3a6b;
+    font-size: 12px;
+    color: #475f87;
+    margin-bottom: 16px;
+    line-height: 1.4;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    #barcodePrintSection, #barcodePrintSection * {
+        visibility: visible;
+    }
+    #barcodePrintSection {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        display: flex !important;
+        justify-content: center;
+        align-items: center;
+    }
+}
