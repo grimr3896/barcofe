@@ -11,9 +11,13 @@ import {
 } from "lucide-react";
 
 // @ts-ignore
-import { PDF417 } from "pdf417-generator";
+import { PDF417 as PDF417_Named } from "pdf417-generator";
+// @ts-ignore
+import PDF417_Default from "pdf417-generator";
 // @ts-ignore
 import JsBarcode from "jsbarcode";
+
+const PDF417 = PDF417_Named || (PDF417_Default && typeof PDF417_Default === 'object' && ((PDF417_Default as any).PDF417 || PDF417_Default)) || (window as any).PDF417;
 
 // US States Array (All 50 US States)
 const US_STATES = [
@@ -182,6 +186,43 @@ function getAuditNumber(): string {
   return String(new Date().getFullYear()).slice(-2);
 }
 
+function generateTrackStrings(person: any) {
+  const stateCode = (person.state_code || 'CA').toUpperCase();
+  const licNum = person.license_number || '';
+  const lastName = (person.last_name || '').toUpperCase();
+  const firstName = (person.first_name || '').toUpperCase();
+  
+  // Get expiry YYMM from DBA field (MMDDYYYY)
+  let yymm = '';
+  const expiry = person.expiry_date || '';
+  if (expiry.length === 8) {
+    const mm = expiry.slice(0, 2);
+    const yy = expiry.slice(6, 8);
+    yymm = yy + mm;
+  } else if (expiry.includes('-')) {
+    const parts = expiry.split('-');
+    yymm = parts[0].slice(2) + parts[1];
+  }
+
+  // Get DOB YYMMDD from DBB field (MMDDYYYY)  
+  let dobYYMMDD = '';
+  const dob = person.dob || '';
+  if (dob.length === 8) {
+    const mm = dob.slice(0, 2);
+    const dd = dob.slice(2, 4);
+    const yy = dob.slice(6, 8);
+    dobYYMMDD = yy + mm + dd;
+  } else if (dob.includes('-')) {
+    const parts = dob.split('-');
+    dobYYMMDD = parts[0].slice(2) + parts[1] + parts[2];
+  }
+
+  const track1 = `%${stateCode}${licNum}^${lastName}/${firstName}^${yymm}?`;
+  const track2 = `;${licNum}=${yymm}${dobYYMMDD}?`;
+  
+  return { track1, track2 };
+}
+
 function convertHeight(heightStr: string): string {
   const match = heightStr.match(/(\d+)['\s](\d+)/);
   if (match) {
@@ -324,7 +365,17 @@ export default function App() {
         const ctx = canvas.getContext('2d');
         if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
         try {
+          // 2. Generate PDF417 — PDF417.draw(aamvaString, canvas, 3, 5)
           PDF417.draw(encodedString, canvas, 3, 5);
+          
+          // 3. Show canvas — document.getElementById('pdf417Canvas').style.display = 'block'
+          canvas.style.display = 'block';
+          
+          // 4. Hide any placeholder text
+          const placeholder = document.getElementById('pdf417Placeholder');
+          if (placeholder) {
+            placeholder.style.display = 'none';
+          }
         } catch (err) {
           console.error("PDF417 Draw Error", err);
         }
@@ -793,10 +844,15 @@ export default function App() {
                   {/* Top segment: Feature 2 — Printed magnetic track string & solid black magnetic stripe */}
                   <div className="flex flex-col gap-2">
                     <div className="flex justify-between items-start">
-                      <div className="border border-slate-350 rounded px-1.5 py-0.5 bg-slate-50/95 font-mono text-[9px] font-bold text-slate-850 tracking-tighter leading-tight max-w-full overflow-x-hidden">
-                        <div>{`%${formData.state_code}DL-${formData.issue_date ? formData.issue_date.substring(0, 4) : '2009'}-${formData.document_discriminator ? formData.document_discriminator.slice(-5) : '18273'}^${(formData.last_name || '').toUpperCase()}/${(formData.first_name || '').toUpperCase()}^${formData.expiry_date ? formData.expiry_date.substring(2, 4) + formData.expiry_date.substring(5, 7) : '1708'}?`}</div>
-                        <div>{`;${formData.license_number || ''}=${formData.expiry_date ? formData.expiry_date.substring(2, 4) + formData.expiry_date.substring(5, 7) : '1708'}${formData.dob ? formData.dob.replace(/-/g, '').substring(4, 8) : '0715'}?`}</div>
-                      </div>
+                      {(() => {
+                        const { track1, track2 } = generateTrackStrings(formData);
+                        return (
+                          <div className="border border-slate-350 rounded px-1.5 py-0.5 bg-slate-50/95 font-mono text-[9px] font-bold text-slate-850 tracking-tighter leading-tight max-w-full overflow-x-hidden">
+                            <div>{track1}</div>
+                            <div>{track2}</div>
+                          </div>
+                        );
+                      })()}
                     </div>
                     {/* Magnetic stripe */}
                     <div className="h-8 bg-slate-950 w-full rounded flex items-center justify-end px-3">
@@ -825,9 +881,13 @@ export default function App() {
                     {/* Middle right: PDF417 Canvas + sequence label */}
                     <div className="col-span-8 flex flex-col items-end gap-0.5">
                       <div className="w-full bg-white border border-slate-200 p-1 flex items-center justify-center min-h-[95px] relative rounded-md shadow-inner overflow-hidden pr-7">
+                        <div id="pdf417Placeholder" className="absolute text-slate-400 font-mono text-[10px] italic pointer-events-none select-none">
+                          Generating barcode...
+                        </div>
                         <canvas 
                           id="pdf417Canvas"
                           className="max-w-[calc(100%-14px)] max-h-[85px] object-contain"
+                          style={{ display: "none" }}
                         />
                         {/* Sequence number (6 digits, rotated 90° on right edge of PDF417 section) */}
                         <div className="absolute right-[2px] top-1/2 -translate-y-1/2 rotate-90 origin-center text-[7.5px] font-mono font-extrabold text-slate-500 uppercase tracking-wider select-none leading-none whitespace-nowrap">
