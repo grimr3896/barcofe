@@ -95,6 +95,18 @@
                         <input type="text" id="country" name="country" value="{{ data.country if data else (data.country or 'KENYA') }}">
                     </div>
 
+                    <!-- Sequence Number -->
+                    <div class="form-group">
+                        <label for="sequence_number">Sequence Number</label>
+                        <input type="text" id="sequence_number" name="sequence_number" readonly value="{{ data.sequence_number if data else '' }}">
+                    </div>
+
+                    <!-- Revision Date -->
+                    <div class="form-group">
+                        <label for="revision_date">Revision Date</label>
+                        <input type="text" id="revision_date" name="revision_date" readonly value="{{ data.revision_date if data else '' }}">
+                    </div>
+
                     <!-- Sex -->
                     <div class="form-group">
                         <label for="sex">Sex</label>
@@ -134,22 +146,47 @@
                         </select>
                     </div>
 
-                    <!-- Category -->
+                    <!-- Category / Vehicle Class -->
                     <div class="form-group col-span-2">
-                        <label for="category">Category</label>
-                        <input type="text" id="category" name="category" value="{{ data.category if data else 'STUDENT' }}">
+                        <label for="category">Vehicle Class</label>
+                        <select id="category" name="category">
+                            <option value="A" {% if data and data.category == 'A' %}selected{% endif %}>A - Commercial Vehicle &gt;26000 lbs</option>
+                            <option value="B" {% if data and data.category == 'B' %}selected{% endif %}>B - Commercial Vehicle &gt;26000 lbs single</option>
+                            <option value="C" {% if not data or data.category == 'C' or data.category == 'STUDENT' %}selected{% endif %}>C - Vehicle w/GVWR &le;26000 No M/C (default)</option>
+                            <option value="M" {% if data and data.category == 'M' %}selected{% endif %}>M - Motorcycle only</option>
+                            <option value="A/M" {% if data and data.category == 'A/M' %}selected{% endif %}>A/M - Commercial + Motorcycle</option>
+                            <option value="C/M" {% if data and data.category == 'C/M' %}selected{% endif %}>C/M - Class C + Motorcycle</option>
+                        </select>
                     </div>
 
                     <!-- Restrictions -->
                     <div class="form-group col-span-2">
                         <label for="restrictions">Restrictions</label>
-                        <input type="text" id="restrictions" name="restrictions" value="{{ data.restrictions if data else 'NONE' }}">
+                        <select id="restrictions" name="restrictions">
+                            <option value="NONE" {% if not data or data.restrictions == 'NONE' %}selected{% endif %}>None (default)</option>
+                            <option value="A" {% if data and data.restrictions == 'A' %}selected{% endif %}>A - Military only</option>
+                            <option value="B" {% if data and data.restrictions == 'B' %}selected{% endif %}>B - Corrective lenses</option>
+                            <option value="C" {% if data and data.restrictions == 'C' %}selected{% endif %}>C - Mechanical aid</option>
+                            <option value="D" {% if data and data.restrictions == 'D' %}selected{% endif %}>D - Prosthetic aid</option>
+                            <option value="E" {% if data and data.restrictions == 'E' %}selected{% endif %}>E - No manual transmission</option>
+                            <option value="F" {% if data and data.restrictions == 'F' %}selected{% endif %}>F - Outside mirror required</option>
+                            <option value="G" {% if data and data.restrictions == 'G' %}selected{% endif %}>G - Daylight driving only</option>
+                        </select>
                     </div>
 
                     <!-- Endorsements -->
                     <div class="form-group col-span-2">
                         <label for="endorsements">Endorsements</label>
-                        <input type="text" id="endorsements" name="endorsements" value="{{ data.endorsements if data else 'NONE' }}">
+                        <select id="endorsements" name="endorsements">
+                            <option value="NONE" {% if not data or data.endorsements == 'NONE' %}selected{% endif %}>None (default)</option>
+                            <option value="H" {% if data and data.endorsements == 'H' %}selected{% endif %}>H - Hazardous Materials</option>
+                            <option value="M" {% if data and data.endorsements == 'M' %}selected{% endif %}>M - Motorcycle</option>
+                            <option value="N" {% if data and data.endorsements == 'N' %}selected{% endif %}>N - Tank Vehicle</option>
+                            <option value="P" {% if data and data.endorsements == 'P' %}selected{% endif %}>P - Passenger</option>
+                            <option value="S" {% if data and data.endorsements == 'S' %}selected{% endif %}>S - School Bus</option>
+                            <option value="T" {% if data and data.endorsements == 'T' %}selected{% endif %}>T - Double/Triple Trailers</option>
+                            <option value="X" {% if data and data.endorsements == 'X' %}selected{% endif %}>X - Tanker + Hazmat</option>
+                        </select>
                     </div>
                 </div>
 
@@ -163,75 +200,152 @@
         <section class="preview-container">
             <h2 style="align-self: flex-start; width: 100%; margin-bottom: 20px;">Live Preview</h2>
             
-            {% if generated %}
-                <!-- Combined Download Both Button at the top -->
-                <div style="width: 100%; margin-bottom: 24px; text-align: right;">
-                    <a href="/download/both" class="btn-action" style="background-color: #333333; color: white; border: none; font-weight: bold; padding: 10px 20px; display: inline-flex; width: auto; font-size: 13px; text-decoration: none; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em;">
-                        📥 Download Both (Combined Layout)
-                    </a>
-                </div>
-            {% endif %}
-
-            <div class="barcode-box" style="flex-direction: column; gap: 32px; padding: 24px; align-items: stretch; justify-content: center; min-height: auto; width: 100%;">
+            <div class="results-cards-container" style="display: flex; flex-direction: column; gap: 24px; width: 100%;">
                 {% if generated %}
-                    <!-- PDF417 PREVIEW -->
-                    <div class="preview-item" style="text-align: center; width: 100%;">
-                        <span class="preview-label" style="display: block; font-size: 14px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; color: #1a3a6b; margin-bottom: 8px;">--- PDF417 Barcode (Full Data) ---</span>
-                        <div style="background: white; border: 1px solid #e1e3e8; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 8px;">
-                            <img id="barcodeImage" src="/barcode.png" alt="PDF417 Barcode" style="max-height: 200px; width: auto; max-width: 100%; display: block; margin: 0 auto;">
+                    <!-- SECTION 1 — MAGNETIC TRACK DATA -->
+                    <div class="result-card" style="background: white; border: 1px solid #c4c6d0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; align-items: stretch; width: 100%;">
+                        <div style="background-color: #1a3a6b; color: white; padding: 12px 16px; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; text-align: left;">
+                            MAGNETIC STRIPE TRACK DATA
                         </div>
-                        <p style="font-size: 12px; color: #666666; margin: 8px 0 12px 0; font-weight: 500;">
-                            Encodes all 19 fields — use for full verification
-                        </p>
-                        <a href="/download/pdf417" class="btn-action" style="background-color: #1a3a6b; color: white; border: none; width: auto; max-width: 250px; margin: 0 auto; display: inline-flex; font-size: 13px; text-decoration: none;">
-                            📥 Download PDF417
-                        </a>
+                        <div style="padding: 20px; text-align: center; display: flex; flex-direction: column; gap: 16px; align-items: center; justify-content: center;">
+                            <div style="width: 100%; text-align: left; font-family: monospace; font-size: 12px; background-color: #fafafa; border: 1px solid #e1e3e8; border-radius: 6px; padding: 16px; box-sizing: border-box; line-height: 1.6; color: #333333;">
+                                <div style="font-weight: bold; color: #666666; margin-bottom: 4px;">Track 1:</div>
+                                <div style="word-break: break-all; margin-bottom: 12px; background: #eef1f6; padding: 6px 10px; border-radius: 4px; border: 1px solid #d1d5db;">{{ data.magnetic_track_1 }}</div>
+                                
+                                <div style="font-weight: bold; color: #666666; margin-bottom: 4px;">Track 2:</div>
+                                <div style="word-break: break-all; margin-bottom: 12px; background: #eef1f6; padding: 6px 10px; border-radius: 4px; border: 1px solid #d1d5db;">{{ data.magnetic_track_2 }}</div>
+                                
+                                <div style="font-weight: bold; color: #666666; margin-bottom: 4px;">Printed Code:</div>
+                                <div style="word-break: break-all; background: #eef1f6; padding: 6px 10px; border-radius: 4px; border: 1px solid #d1d5db;">{{ data.magnetic_track_1 }}{{ data.magnetic_track_2 }}</div>
+                            </div>
+                            <a href="/download/track" class="btn-action" style="background-color: #22863a; color: white; border: none; font-weight: bold; padding: 10px 24px; font-size: 13px; text-decoration: none; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; display: inline-flex; align-items: center; gap: 8px; width: fit-content; margin-top: 4px;">
+                                📥 Download Track Data (.txt)
+                            </a>
+                        </div>
                     </div>
-                    
-                    <!-- Code 128 PREVIEW -->
-                    <div class="preview-item" style="text-align: center; width: 100%; border-top: 1px dashed #c4c6d0; padding-top: 24px;">
-                        <span class="preview-label" style="display: block; font-size: 14px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; color: #22863a; margin-bottom: 8px;">--- Code 128 Barcode (Licence Number Only) ---</span>
-                        <div style="background: white; border: 1px solid #e1e3e8; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 8px;">
-                            <img id="code128Image" src="/code128.png" alt="Code 128 Barcode" style="max-height: 100px; width: auto; max-width: 100%; display: block; margin: 0 auto;">
+
+                    <!-- SECTION 2 — VEHICLE CLASS / ENDORSEMENTS / RESTRICTIONS -->
+                    <div class="result-card" style="background: white; border: 1px solid #c4c6d0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; align-items: stretch; width: 100%;">
+                        <div style="background-color: #1a3a6b; color: white; padding: 12px 16px; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; text-align: left;">
+                            VEHICLE INFO BLOCK
                         </div>
-                        <p style="font-size: 12px; color: #666666; margin: 8px 0 12px 0; font-weight: 500;">
-                            Encodes licence number only — use for quick lookup
-                        </p>
-                        <a href="/download/code128" class="btn-action" style="background-color: #22863a; color: white; border: none; width: auto; max-width: 250px; margin: 0 auto; display: inline-flex; font-size: 13px; text-decoration: none;">
-                            📥 Download Code 128
-                        </a>
+                        <div style="padding: 20px; text-align: center; display: flex; flex-direction: column; gap: 16px; align-items: center; justify-content: center;">
+                            <div style="background: white; border: 1px solid #e1e3e8; border-radius: 8px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); width: 100%;">
+                                <img src="/info_block.png" alt="Vehicle Info Block" style="max-height: 90px; width: auto; max-width: 100%; display: block; margin: 0 auto; object-fit: contain;">
+                            </div>
+                            <div style="width: 100%; text-align: left; font-family: monospace; font-size: 13px; background-color: #fafafa; border: 1px solid #e1e3e8; border-radius: 6px; padding: 14px; box-sizing: border-box; color: #333333; line-height: 1.6;">
+                                <strong>CLASS:</strong> {{ data.category | class_desc }}<br>
+                                <strong>ENDORSEMENTS:</strong> {{ data.endorsements | endorsements_desc }}<br>
+                                <strong>RESTRICTIONS:</strong> {{ data.restrictions | restrictions_desc }}
+                            </div>
+                            <a href="/download/infoblock" class="btn-action" style="background-color: #22863a; color: white; border: none; font-weight: bold; padding: 10px 24px; font-size: 13px; text-decoration: none; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; display: inline-flex; align-items: center; gap: 8px; width: fit-content; margin-top: 4px;">
+                                📥 Download Info Block (.png)
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- SECTION 3 — PDF417 BARCODE -->
+                    <div class="result-card" style="background: white; border: 1px solid #c4c6d0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; align-items: stretch; width: 100%;">
+                        <div style="background-color: #1a3a6b; color: white; padding: 12px 16px; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; text-align: left;">
+                            PDF417 BARCODE — Full Data (19 fields)
+                        </div>
+                        <div style="padding: 20px; text-align: center; display: flex; flex-direction: column; gap: 16px; align-items: center; justify-content: center;">
+                            <div style="background: white; border: 1px solid #e1e3e8; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); width: 100%;">
+                                <img id="barcodeImage" src="/barcode.png" alt="PDF417 Barcode" style="max-height: 200px; width: auto; max-width: 100%; display: block; margin: 0 auto; object-fit: contain;">
+                            </div>
+                            <p style="font-size: 12px; color: #666666; margin: 0; font-weight: 500;">
+                                Official compliance standard PDF417 format encoding 19 core state-level data items.
+                            </p>
+                            <a href="/download/pdf417" class="btn-action" style="background-color: #22863a; color: white; border: none; font-weight: bold; padding: 10px 24px; font-size: 13px; text-decoration: none; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; display: inline-flex; align-items: center; gap: 8px; width: fit-content; margin-top: 4px;">
+                                📥 Download PDF417 (.png)
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- SECTION 4 — CODE 128 BARCODE -->
+                    <div class="result-card" style="background: white; border: 1px solid #c4c6d0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; align-items: stretch; width: 100%;">
+                        <div style="background-color: #1a3a6b; color: white; padding: 12px 16px; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; text-align: left;">
+                            CODE 128 BARCODE — Licence Number Only
+                        </div>
+                        <div style="padding: 20px; text-align: center; display: flex; flex-direction: column; gap: 16px; align-items: center; justify-content: center;">
+                            <div style="background: white; border: 1px solid #e1e3e8; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); width: 100%;">
+                                <img id="code128Image" src="/code128.png" alt="Code 128 Barcode" style="max-height: 100px; width: auto; max-width: 100%; display: block; margin: 0 auto; object-fit: contain;">
+                            </div>
+                            <p style="font-size: 12px; color: #666666; margin: 0; font-weight: 500;">
+                                Direct 1D Code 128 barcode containing user license number.
+                            </p>
+                            <a href="/download/code128" class="btn-action" style="background-color: #22863a; color: white; border: none; font-weight: bold; padding: 10px 24px; font-size: 13px; text-decoration: none; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; display: inline-flex; align-items: center; gap: 8px; width: fit-content; margin-top: 4px;">
+                                📥 Download Code 128 (.png)
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- SECTION 5 — SEQUENCE NUMBER -->
+                    <div class="result-card" style="background: white; border: 1px solid #c4c6d0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; align-items: stretch; width: 100%;">
+                        <div style="background-color: #1a3a6b; color: white; padding: 12px 16px; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; text-align: left;">
+                            INVENTORY SEQUENCE NUMBER
+                        </div>
+                        <div style="padding: 20px; text-align: center; display: flex; flex-direction: column; gap: 16px; align-items: center; justify-content: center;">
+                            <div style="font-family: monospace; font-size: 32px; font-weight: bold; color: #1a3a6b; background: #fafafa; border: 1px solid #e1e3e8; border-radius: 6px; padding: 16px 32px; letter-spacing: 0.05em; width: 100%; box-sizing: border-box;">
+                                {{ data.sequence_number }}
+                            </div>
+                            <p style="font-size: 12px; color: #666666; margin: 0; font-weight: 500;">
+                                Unique internal database inventory logging sequence number.
+                            </p>
+                            <a href="/download/sequence" class="btn-action" style="background-color: #22863a; color: white; border: none; font-weight: bold; padding: 10px 24px; font-size: 13px; text-decoration: none; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; display: inline-flex; align-items: center; gap: 8px; width: fit-content; margin-top: 4px;">
+                                📥 Download Sequence (.txt)
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- SECTION 6 — REVISION DATE -->
+                    <div class="result-card" style="background: white; border: 1px solid #c4c6d0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; align-items: stretch; width: 100%;">
+                        <div style="background-color: #1a3a6b; color: white; padding: 12px 16px; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; text-align: left;">
+                            CARD REVISION DATE
+                        </div>
+                        <div style="padding: 20px; text-align: center; display: flex; flex-direction: column; gap: 16px; align-items: center; justify-content: center;">
+                            <div style="font-family: monospace; font-size: 26px; font-weight: bold; color: #1a3a6b; background: #fafafa; border: 1px solid #e1e3e8; border-radius: 6px; padding: 16px 32px; width: 100%; box-sizing: border-box;">
+                                Rev {{ data.revision_date }}
+                            </div>
+                            <p style="font-size: 12px; color: #666666; margin: 0; font-weight: 500;">
+                                Verified security revision control date stamp.
+                            </p>
+                            <a href="/download/revision" class="btn-action" style="background-color: #22863a; color: white; border: none; font-weight: bold; padding: 10px 24px; font-size: 13px; text-decoration: none; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; display: inline-flex; align-items: center; gap: 8px; width: fit-content; margin-top: 4px;">
+                                📥 Download Revision (.txt)
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- SECTION 7 — FULL COMBINED LAYOUT -->
+                    <div class="result-card" style="background: white; border: 1px solid #c4c6d0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; align-items: stretch; width: 100%;">
+                        <div style="background-color: #1a3a6b; color: white; padding: 12px 16px; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; text-align: left;">
+                            FULL CARD BACK LAYOUT (Print Ready)
+                        </div>
+                        <div style="padding: 20px; text-align: center; display: flex; flex-direction: column; gap: 16px; align-items: center; justify-content: center;">
+                            <div style="background: white; border: 1px solid #e1e3e8; border-radius: 8px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); width: 100%;">
+                                <img id="layoutImage" src="/barcode_layout.png" alt="Full Back Layout" style="width: 100%; height: auto; max-width: 100%; display: block; margin: 0 auto; border-radius: 4px;">
+                            </div>
+                            <p style="font-size: 12px; color: #666666; margin: 0; font-weight: 500;">
+                                Composite template comprising magnetic stripe simulation, printed track record, text blocks, PDF417, vertical sequence routing and Code 128.
+                            </p>
+                            <a href="/download/layout" class="btn-action" style="background-color: #22863a; color: white; border: none; font-weight: bold; padding: 10px 24px; font-size: 13px; text-decoration: none; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; display: inline-flex; align-items: center; gap: 8px; width: fit-content; margin-top: 4px;">
+                                📥 Download Full Layout (.png)
+                            </a>
+                        </div>
                     </div>
                 {% else %}
-                    <div class="fallback-placeholder" style="padding: 40px 0;">
-                        <span style="font-size: 36px; margin-bottom: 8px;">📊</span>
+                    <div class="fallback-placeholder" style="padding: 40px 0; text-align: center; color: #666666; width: 100%;">
+                        <span style="font-size: 36px; display: block; margin-bottom: 12px;">📊</span>
                         Awaiting Generation...
                     </div>
                 {% endif %}
             </div>
 
-            <div class="info-banner">
+            <div class="info-banner" style="margin-top: 16px; width: 100%;">
                 ℹ️ Standard PDF417 encoding optimized for institutional license readers and state-level compliance verification.
             </div>
 
-            {% if generated %}
-            <!-- DOWNLOAD OPTIONS BLOCK -->
-            <div style="width: 100%; background: #ffffff; border: 1px solid #c4c6d0; border-radius: 4px; padding: 20px; box-sizing: border-box; margin-bottom: 16px;">
-                <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 13px; font-weight: bold; text-transform: uppercase; color: #43474f; letter-spacing: 0.05em; text-align: center;">Download Options</h3>
-                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-                    <a href="/download/pdf417" class="btn-action" style="flex: 1; min-width: 140px; background-color: #1a3a6b; color: white; border: none; font-size: 13px; text-align: center; height: 44px; justify-content: center; align-items: center; display: inline-flex; box-sizing: border-box; text-decoration: none;">
-                        Download PDF417
-                    </a>
-                    <a href="/download/code128" class="btn-action" style="flex: 1; min-width: 140px; background-color: #22863a; color: white; border: none; font-size: 13px; text-align: center; height: 44px; justify-content: center; align-items: center; display: inline-flex; box-sizing: border-box; text-decoration: none;">
-                        Download Code 128
-                    </a>
-                    <a href="/download/both" class="btn-action" style="flex: 1; min-width: 140px; background-color: #333333; color: white; border: none; font-size: 13px; text-align: center; height: 44px; justify-content: center; align-items: center; display: inline-flex; box-sizing: border-box; text-decoration: none;">
-                        Download Both
-                    </a>
-                </div>
-            </div>
-            {% endif %}
-
-            <div style="width: 100%;">
+            <div style="width: 100%; margin-top: 16px;">
                 <button type="button" class="btn-action btn-print" onclick="window.print()" style="width: 100%; height: 44px;" {% if not generated %}disabled{% endif %}>
                     Print Record
                 </button>

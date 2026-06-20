@@ -34,10 +34,49 @@ const INITIAL_FORM_DATA = {
   height: "5'11\"",
   eye_color: "BRN",
   hair_color: "BLK",
-  category: "STUDENT",
+  category: "C",
   restrictions: "NONE",
   endorsements: "NONE",
   country: "KENYA",
+  sequence_number: "",
+  revision_date: "",
+  magnetic_track_1: "",
+  magnetic_track_2: "",
+  magnetic_track: ""
+};
+
+const getMagneticTracks = (data: typeof INITIAL_FORM_DATA) => {
+  let countyUpper = (data.county || "CA").trim().toUpperCase();
+  let stCode = countyUpper.slice(0, 2);
+  if (!stCode || countyUpper === "NONE") {
+    stCode = "CA";
+  }
+  const lic = (data.license_number || "").trim().toUpperCase();
+  const last = (data.last_name || "").trim().toUpperCase();
+  const first = (data.first_name || "").trim().toUpperCase();
+  
+  const formatToYYMMDD = (dateStr: string) => {
+    if (!dateStr) return "000000";
+    const parts = dateStr.trim().split("-");
+    if (parts.length === 3 && parts[0].length === 4) {
+      const [year, month, day] = parts;
+      const shortYear = year.slice(-2);
+      return `${shortYear}${month}${day}`;
+    }
+    return "000000";
+  };
+  
+  const expYY = formatToYYMMDD(data.expiry_date);
+  const dobYY = formatToYYMMDD(data.dob);
+  
+  const track1 = `%${stCode}${lic}^${last}/${first}^${expYY}?`;
+  const track2 = `;${lic}=${expYY}${dobYY}?`;
+  
+  return {
+    track1,
+    track2,
+    combined: `Track 1: ${track1}\nTrack 2: ${track2}`
+  };
 };
 
 const FIELD_ORDER = [
@@ -60,7 +99,54 @@ const FIELD_ORDER = [
   ["DCB", "restrictions"],
   ["DCD", "endorsements"],
   ["DCG", "country"],
+  ["DCT", "magnetic_track_1"],
+  ["DCU", "magnetic_track_2"],
+  ["DCM", "sequence_number"],
+  ["DCN", "revision_date"],
 ] as const;
+
+const formatDateToMMDDYY = (dateStr: string): string => {
+  if (!dateStr || dateStr.trim().toLowerCase() === "none") return "NONE";
+  const parts = dateStr.trim().split("-");
+  if (parts.length === 3 && parts[0].length === 4) {
+    const [year, month, day] = parts;
+    const shortYear = year.slice(-2);
+    return `${month}/${day}/${shortYear}`;
+  }
+  return dateStr;
+};
+
+const formatDateToYYYYMMDD = (dateStr: string): string => {
+  if (!dateStr || dateStr.trim().toLowerCase() === "none") return "NONE";
+  const cleaned = dateStr.replace(/[\/-]/g, "").trim();
+  if (/^\d{8}$/.test(cleaned)) {
+    return cleaned;
+  }
+  const parts = dateStr.trim().split(/[\/-]/);
+  if (parts.length === 3) {
+    if (parts[0].length === 4) {
+      const [year, month, day] = parts;
+      return `${year}${month.padStart(2, "0")}${day.padStart(2, "0")}`;
+    } else if (parts[2].length === 4) {
+      const [p1, p2, year] = parts;
+      return `${year}${p1.padStart(2, "0")}${p2.padStart(2, "0")}`;
+    }
+  }
+  return cleaned.toUpperCase();
+};
+
+const cleanLicenseNumber = (license: string): string => {
+  return license.toUpperCase().replace(/[^A-Z0-9]/g, "");
+};
+
+const getF = (val: string) => (val || "NONE").trim().toUpperCase();
+
+const getIIN = (country: string, state: string): string => {
+  const c = country.toUpperCase().trim();
+  if (c === "KENYA") return "990001";
+  if (c === "CANADA") return "300022";
+  return "636014";
+};
 
 export default function App() {
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
@@ -81,26 +167,170 @@ export default function App() {
 
   // Field change handler
   const handleInputChange = (key: string, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
+    setFormData((prev) => {
+      const updated = {
+        ...prev,
+        [key]: value,
+      };
+      const tracks = getMagneticTracks(updated);
+      return {
+        ...updated,
+        magnetic_track_1: tracks.track1,
+        magnetic_track_2: tracks.track2,
+        magnetic_track: tracks.combined,
+      };
+    });
   };
 
   // Form encoded text builder
   const buildEncodedText = (data: typeof INITIAL_FORM_DATA) => {
-    return FIELD_ORDER.map(([prefix, fieldKey]) => {
-      let val = data[fieldKey as keyof typeof INITIAL_FORM_DATA];
-      if (val === undefined || val === null) {
-        val = "NONE";
-      } else {
-        val = val.trim();
-        if (val === "") {
-          val = "NONE";
-        }
-      }
-      return `${prefix} ${val}`;
-    }).join("\n");
+    // Validate and format values first
+    const iin = getIIN(data.country, data.county);
+    const version = "11";
+    const jversion = "00";
+    const numSubfiles = "01";
+    const subfileType = "DL";
+
+    // Build subfile elements
+    const elements: string[] = [];
+
+    // 1. License Number (8-18 chars, alphanumeric)
+    let lic = cleanLicenseNumber(data.license_number);
+    if (lic.length < 8) lic = lic.padEnd(8, "0");
+    if (lic.length > 18) lic = lic.slice(0, 18);
+    elements.push(`DAQ ${lic}`);
+
+    // 2. Name (Last, First, Middle) -> Rule 3
+    const last = getF(data.last_name);
+    const first = getF(data.first_name);
+    const mid = data.middle_name && data.middle_name.toUpperCase() !== "NONE" ? data.middle_name.trim().toUpperCase() : "";
+    const nameVal = `${last},${first},${mid}`;
+    elements.push(`DAA ${nameVal}`);
+
+    // 3. Date of Birth -> Rule 1
+    elements.push(`DBB ${formatDateToYYYYMMDD(data.dob)}`);
+
+    // 4. Issue Date -> Rule 1
+    elements.push(`DBD ${formatDateToYYYYMMDD(data.issue_date)}`);
+
+    // 5. Expiry Date -> Rule 1
+    elements.push(`DBA ${formatDateToYYYYMMDD(data.expiry_date)}`);
+
+    // 6. Address -> Rule 5
+    const street = getF(data.address);
+    const city = getF(data.city);
+    const state = getF(data.county);
+    const zip = getF(data.zip);
+    const addressVal = `${street},${city},${state},${zip}`;
+    elements.push(`DAG ${addressVal}`);
+
+    // 7. City
+    elements.push(`DAI ${city}`);
+
+    // 8. State/Province
+    elements.push(`DAJ ${state}`);
+
+    // 9. ZIP/Postal Code
+    elements.push(`DAK ${zip}`);
+
+    // 10. Sex (M/F)
+    let sexVal = getF(data.sex);
+    if (sexVal !== "M" && sexVal !== "F") sexVal = "M"; // Safe default
+    elements.push(`DBC ${sexVal}`);
+
+    // 11. Height
+    elements.push(`DAU ${getF(data.height)}`);
+
+    // 12. Eye Color
+    elements.push(`DAY ${getF(data.eye_color)}`);
+
+    // 13. Hair Color
+    elements.push(`DAZ ${getF(data.hair_color)}`);
+
+    // 14. Class -> Rule 7
+    let categoryRaw = getF(data.category);
+    let classCode = categoryRaw;
+    if (categoryRaw === "STUDENT") classCode = "C";
+    elements.push(`DCA ${classCode}`);
+
+    // 15. Restrictions -> Rule 8
+    let restrRaw = getF(data.restrictions);
+    let restrCode = restrRaw;
+    if (restrRaw === "NONE" || !restrRaw) restrCode = "NONE";
+    elements.push(`DCB ${restrCode}`);
+
+    // 16. Endorsements -> Rule 8
+    let endRaw = getF(data.endorsements);
+    let endCode = endRaw;
+    if (endRaw === "NONE" || !endRaw) endCode = "NONE";
+    elements.push(`DCD ${endCode}`);
+
+    // 17. Country
+    elements.push(`DCG ${getF(data.country)}`);
+
+    // 18. Magnetic Track 1
+    elements.push(`DCT ${data.magnetic_track_1 || ""}`);
+
+    // 19. Magnetic Track 2
+    elements.push(`DCU ${data.magnetic_track_2 || ""}`);
+
+    // 20. Sequence Number
+    elements.push(`DCM ${data.sequence_number || ""}`);
+
+    // 21. Revision Date
+    elements.push(`DCN ${data.revision_date || ""}`);
+
+    // Join elements with LF (\n) and terminate with Segment Terminator (CR \r)
+    const subfileData = `${subfileType}\r${elements.join("\n")}\n`;
+
+    // Calculate Length and Offset
+    const offsetStr = "0031";
+    const lengthStr = subfileData.length.toString().padStart(4, "0");
+
+    // Build complete string
+    const header = `@\n\u001e\rANSI ${iin}${version}${jversion}${numSubfiles}${subfileType}${offsetStr}${lengthStr}`;
+    
+    return `${header}${subfileData}`;
+  };
+
+  const getCategoryDesc = (code: string) => {
+    switch(code) {
+      case "A": return "Commercial Vehicle >26000 lbs";
+      case "B": return "Commercial Vehicle >26000 lbs single";
+      case "C": return "Vehicle w/GVWR <=26000 No M/C";
+      case "M": return "Motorcycle only";
+      case "A/M": return "Commercial + Motorcycle";
+      case "C/M": return "Class C + Motorcycle";
+      default: return getF(code);
+    }
+  };
+
+  const getEndorsementDesc = (code: string) => {
+    switch(code) {
+      case "NONE": return "None";
+      case "H": return "Hazardous Materials";
+      case "M": return "Motorcycle";
+      case "N": return "Tank Vehicle";
+      case "P": return "Passenger";
+      case "S": return "School Bus";
+      case "T": return "Double/Triple Trailers";
+      case "X": return "Tanker + Hazmat";
+      default: return getF(code);
+    }
+  };
+
+  const getRestrictionDesc = (code: string) => {
+    switch(code) {
+      case "NONE": return "None";
+      case "A": return "Military only";
+      case "B": return "Corrective lenses";
+      case "C": return "Mechanical aid";
+      case "D": return "Prosthetic aid";
+      case "E": return "No manual transmission";
+      case "F": return "Outside mirror required";
+      case "G": return "Daylight driving only";
+      default: return getF(code);
+    }
   };
 
   // Helper to draw the customized physical ID card-style layout
@@ -114,48 +344,102 @@ export default function App() {
     }
 
     targetCanvas.width = 1200;
-    targetCanvas.height = 400;
+    targetCanvas.height = 600;
     const ctx = targetCanvas.getContext("2d");
     if (!ctx) return;
 
     // Fill white background
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, 1200, 400);
+    ctx.fillRect(0, 0, 1200, 600);
 
-    // Draw the stretched/resized barcode at x=40, y=30, width=1120, height=260
-    ctx.drawImage(tempCanvas, 40, 30, 1120, 260);
+    // 1. Black Magnetic Stripe (Height 80px)
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, 1200, 80);
 
-    // Center middle text at y=310
-    ctx.fillStyle = "#1a1a1a";
-    ctx.font = "bold 28px monospace";
-    ctx.textAlign = "center";
+    // 2. Track Data Strings below magnetic stripe
+    ctx.fillStyle = "#333333";
+    ctx.font = "bold 15px monospace";
+    ctx.textAlign = "left";
     ctx.textBaseline = "top";
     
-    const idStr = formData.license_number.trim().toUpperCase();
-    const nameStr = `${formData.first_name.trim().toUpperCase()} ${formData.last_name.trim().toUpperCase()}`;
-    const textMiddle = `ID: ${idStr}     NAME: ${nameStr}`;
-    ctx.fillText(textMiddle, 600, 310);
+    const { track1, track2 } = getMagneticTracks(formData);
+    ctx.fillText(`Track 1: ${track1}`, 40, 100);
+    ctx.fillText(`Track 2: ${track2}`, 40, 125);
 
-    // Bottom strip separating line (2px, #cccccc)
+    // 3. Divider line
     ctx.strokeStyle = "#cccccc";
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(40, 355);
-    ctx.lineTo(1160, 355);
+    ctx.moveTo(40, 160);
+    ctx.lineTo(1160, 160);
     ctx.stroke();
 
-    // Bottom strip text: left organisation, right expiry (22px, color #666666)
-    ctx.fillStyle = "#666666";
-    ctx.font = "bold 22px monospace";
-    
-    ctx.textAlign = "left";
-    const orgName = formData.country.trim().toUpperCase() || "KENYA";
-    ctx.fillText(orgName, 40, 365);
+    // 4. LHS Block: CLASS, RESTRICTIONS, ENDORSEMENTS
+    // Heading format
+    const drawMetaRow = (label: string, value: string, desc: string, x: number, y: number) => {
+      if (!ctx) return;
+      ctx.fillStyle = "#666666";
+      ctx.font = "normal 12px sans-serif";
+      ctx.fillText(label, x, y);
+      
+      ctx.fillStyle = "#111111";
+      ctx.font = "bold 14px sans-serif";
+      ctx.fillText(`${value} - ${desc}`, x, y + 20);
+    };
 
+    drawMetaRow("VEHICLE CLASS", getF(formData.category), getCategoryDesc(getF(formData.category)), 40, 190);
+    drawMetaRow("RESTRICTIONS", getF(formData.restrictions), getRestrictionDesc(getF(formData.restrictions)), 40, 250);
+    drawMetaRow("ENDORSEMENTS", getF(formData.endorsements), getEndorsementDesc(getF(formData.endorsements)), 40, 310);
+
+    // 5. Divider inside the LHS/RHS block
+    ctx.strokeStyle = "#e5e7eb";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(400, 180);
+    ctx.lineTo(400, 360);
+    ctx.stroke();
+
+    // 6. Draw PDF417 Barcode (Centered vertically/horizontally in RHS)
+    // Area for PDF417: x = 440 to 1100, y = 180 to 360
+    ctx.drawImage(tempCanvas, 440, 180, 640, 180);
+
+    // 7. Vertically-oriented Sequence Number along right edge of PDF417
+    ctx.save();
+    ctx.translate(1120, 270);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = "#333333";
+    ctx.font = "bold 18px monospace";
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "center";
+    ctx.fillText(formData.sequence_number || "000000", 0, 0);
+    ctx.restore();
+
+    // 8. Bottom divider
+    ctx.strokeStyle = "#cccccc";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(40, 380);
+    ctx.lineTo(1160, 380);
+    ctx.stroke();
+
+    // 9. Code 128 Barcode Space
+    if (code128CanvasRef.current) {
+      // Draw centered Code128
+      ctx.drawImage(code128CanvasRef.current, 400, 410, 400, 120);
+    } else {
+      ctx.fillStyle = "#000000";
+      ctx.font = "bold 20px monospace";
+      ctx.textBaseline = "top";
+      ctx.textAlign = "center";
+      ctx.fillText(formData.license_number, 600, 480);
+    }
+
+    // 10. Card Design Revision Date at bottom right
+    ctx.fillStyle = "#666666";
+    ctx.font = "bold 14px sans-serif";
     ctx.textAlign = "right";
-    const expiryStr = formData.expiry_date.trim().toUpperCase();
-    const expiryText = expiryStr ? `EXPIRY: ${expiryStr}` : "EXPIRY: N/A";
-    ctx.fillText(expiryText, 1160, 365);
+    ctx.textBaseline = "bottom";
+    ctx.fillText(`REV ${formData.revision_date || "10/2020"}`, 1160, 560);
   };
 
   // Barcode generator runner
@@ -225,10 +509,36 @@ export default function App() {
     }, 50);
   };
 
-  // Trigger initial render
+  // Trigger initial render + setup sequence/revision/track values on mount
   useEffect(() => {
-    triggerGeneration();
-  }, [aspectRatio, inkColor, devicePixelRatio]);
+    const seqNum = Math.floor(100000 + Math.random() * 900000).toString();
+    const today = new Date();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    const yyyy = today.getFullYear();
+    const revDate = `${mm}/${dd}/${yyyy}`;
+
+    setFormData((prev) => {
+      const updated = {
+        ...prev,
+        sequence_number: seqNum,
+        revision_date: revDate,
+      };
+      const tracks = getMagneticTracks(updated);
+      return {
+        ...updated,
+        magnetic_track_1: tracks.track1,
+        magnetic_track_2: tracks.track2,
+        magnetic_track: tracks.combined,
+      };
+    });
+  }, []);
+
+  useEffect(() => {
+    if (formData.sequence_number) {
+      triggerGeneration();
+    }
+  }, [aspectRatio, inkColor, devicePixelRatio, formData.sequence_number, formData.category, formData.restrictions, formData.endorsements]);
 
   // Code 128 rendering effect
   useEffect(() => {
@@ -504,15 +814,21 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Category */}
+              {/* Vehicle Class (Category) */}
               <div className="flex flex-col gap-1">
-                <label className="font-semibold text-slate-600">Category</label>
-                <input
-                  type="text"
+                <label className="font-semibold text-slate-600">Vehicle Class</label>
+                <select
                   value={formData.category}
                   onChange={(e) => handleInputChange("category", e.target.value)}
-                  className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800"
-                />
+                  className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800 cursor-pointer"
+                >
+                  <option value="A">A - Commercial Vehicle &gt;26000 lbs</option>
+                  <option value="B">B - Commercial Vehicle &gt;26000 lbs single</option>
+                  <option value="C">C - Vehicle w/GVWR &le;26000 No M/C (default)</option>
+                  <option value="M">M - Motorcycle only</option>
+                  <option value="A/M">A/M - Commercial + Motorcycle</option>
+                  <option value="C/M">C/M - Class C + Motorcycle</option>
+                </select>
               </div>
 
               {/* Country */}
@@ -529,22 +845,80 @@ export default function App() {
               {/* Restrictions */}
               <div className="flex flex-col gap-1 md:col-span-2">
                 <label className="font-semibold text-slate-600">Restrictions</label>
-                <input
-                  type="text"
+                <select
                   value={formData.restrictions}
                   onChange={(e) => handleInputChange("restrictions", e.target.value)}
-                  className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800"
-                />
+                  className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800 cursor-pointer"
+                >
+                  <option value="NONE">None (default)</option>
+                  <option value="A">A - Military only</option>
+                  <option value="B">B - Corrective lenses</option>
+                  <option value="C">C - Mechanical aid</option>
+                  <option value="D">D - Prosthetic aid</option>
+                  <option value="E">E - No manual transmission</option>
+                  <option value="F">F - Outside mirror required</option>
+                  <option value="G">G - Daylight driving only</option>
+                </select>
               </div>
 
               {/* Endorsements */}
               <div className="flex flex-col gap-1 md:col-span-2">
                 <label className="font-semibold text-slate-600">Endorsements</label>
-                <input
-                  type="text"
+                <select
                   value={formData.endorsements}
                   onChange={(e) => handleInputChange("endorsements", e.target.value)}
-                  className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800"
+                  className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800 cursor-pointer"
+                >
+                  <option value="NONE">None (default)</option>
+                  <option value="H">H - Hazardous Materials</option>
+                  <option value="M">M - Motorcycle</option>
+                  <option value="N">N - Tank Vehicle</option>
+                  <option value="P">P - Passenger</option>
+                  <option value="S">S - School Bus</option>
+                  <option value="T">T - Double/Triple Trailers</option>
+                  <option value="X">X - Tanker + Hazmat</option>
+                </select>
+              </div>
+
+              {/* Read-only fields segment */}
+              <div className="grid grid-cols-2 gap-2 md:col-span-2 border-t border-slate-100 pt-3">
+                <div className="flex flex-col gap-1">
+                  <label className="font-semibold text-slate-400">Sequence Number (Auto)</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={formData.sequence_number}
+                    className="border border-slate-150 p-2 rounded-lg bg-slate-100 outline-none text-xs font-mono text-slate-500"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-semibold text-slate-400">Revision Date (Auto)</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={formData.revision_date}
+                    className="border border-slate-150 p-2 rounded-lg bg-slate-100 outline-none text-xs font-mono text-slate-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1 md:col-span-2">
+                <label className="font-semibold text-slate-400">Magnetic Track 1 Display (Auto)</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={formData.magnetic_track_1}
+                  className="border border-slate-150 p-2 rounded-lg bg-slate-100 outline-none text-xs font-mono text-slate-500"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1 md:col-span-2">
+                <label className="font-semibold text-slate-400">Magnetic Track 2 Display (Auto)</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={formData.magnetic_track_2}
+                  className="border border-slate-150 p-2 rounded-lg bg-slate-100 outline-none text-xs font-mono text-slate-500"
                 />
               </div>
 
@@ -757,7 +1131,7 @@ export default function App() {
               </tr>
               <tr>
                 <td className="p-2 border-r border-slate-200 font-bold">DBB (Dob)</td>
-                <td className="p-2">{formData.dob}</td>
+                <td className="p-2">{formatDateToMMDDYY(formData.dob)}</td>
               </tr>
             </tbody>
           </table>
