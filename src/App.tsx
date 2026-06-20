@@ -143,6 +143,45 @@ function formatDateMMDDYYYY(dateStr: string): string {
   return dateStr;
 }
 
+function getRevDate() {
+  const today = new Date();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  const yyyy = today.getFullYear();
+  return `Rev ${mm}/${dd}/${yyyy}`;
+}
+
+function formatHeightDisplay(aamvaHeight: string): string {
+  // Convert 071 IN back to 5'11"
+  const match = aamvaHeight.match(/(\d+)/);
+  if (match) {
+    const totalInches = parseInt(match[1]);
+    const feet = Math.floor(totalInches / 12);
+    const inches = totalInches % 12;
+    return `${feet}'${String(inches).padStart(2,'0')}"`;
+  }
+  return aamvaHeight;
+}
+
+function formatSexDisplay(sexNumeric: string): string {
+  return sexNumeric === '1' ? 'M' : 'F';
+}
+
+function formatIssueDateDisplay(aamvaDate: string): string {
+  // Convert MMDDYYYY to MM/DD/YYYY
+  if (aamvaDate && aamvaDate.length === 8) {
+    const mm = aamvaDate.slice(0, 2);
+    const dd = aamvaDate.slice(2, 4);
+    const yyyy = aamvaDate.slice(4, 8);
+    return `${mm}/${dd}/${yyyy}`;
+  }
+  return aamvaDate;
+}
+
+function getAuditNumber(): string {
+  return String(new Date().getFullYear()).slice(-2);
+}
+
 function convertHeight(heightStr: string): string {
   const match = heightStr.match(/(\d+)['\s](\d+)/);
   if (match) {
@@ -785,20 +824,28 @@ export default function App() {
 
                     {/* Middle right: PDF417 Canvas + sequence label */}
                     <div className="col-span-8 flex flex-col items-end gap-0.5">
-                      <div className="w-full bg-white border border-slate-200 p-1 flex items-center justify-center min-h-[95px] relative rounded-md shadow-inner overflow-hidden">
+                      <div className="w-full bg-white border border-slate-200 p-1 flex items-center justify-center min-h-[95px] relative rounded-md shadow-inner overflow-hidden pr-7">
                         <canvas 
                           id="pdf417Canvas"
-                          className="max-w-full max-h-[85px] object-contain"
+                          className="max-w-[calc(100%-14px)] max-h-[85px] object-contain"
                         />
+                        {/* Sequence number (6 digits, rotated 90° on right edge of PDF417 section) */}
+                        <div className="absolute right-[2px] top-1/2 -translate-y-1/2 rotate-90 origin-center text-[7.5px] font-mono font-extrabold text-slate-500 uppercase tracking-wider select-none leading-none whitespace-nowrap">
+                          {`*718392*`}
+                        </div>
                       </div>
                       <div className="flex justify-between w-full px-0.5 text-[8px] font-mono text-slate-500 font-extrabold">
                         <span>AAMVA 2D BARCODE</span>
-                        <span>SEQ 1042</span>
+                        <span>SEQ 718392</span>
+                      </div>
+                      {/* Disclaimer text next to/below PDF417 */}
+                      <div className="text-[7.5px] text-slate-500 font-mono leading-tight mt-1 text-right select-none max-w-full">
+                        This license is issued as a license to drive a motor vehicle in accordance with state laws.
                       </div>
                     </div>
                   </div>
 
-                  {/* Bottom row: Center (Code 128), Right (Rev date + Signature) */}
+                  {/* Bottom row: Center (Code 128), Right (Signature) */}
                   <div className="grid grid-cols-12 gap-2 items-end pt-1 border-t border-slate-100">
                     {/* Bottom center: Code 128 linear barcode */}
                     <div className="col-span-8 flex flex-col items-center">
@@ -810,8 +857,8 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Bottom right: Rev date + Signature Image */}
-                    <div className="col-span-4 flex flex-col items-end justify-end gap-1 text-right">
+                    {/* Bottom right: Signature Image */}
+                    <div className="col-span-4 flex flex-col items-end justify-end gap-1 text-right pb-1">
                       <div className="flex flex-col items-center w-full">
                         {signatureData ? (
                           <img src={signatureData} alt="Signature Preview" className="h-[28px] max-w-full object-contain mix-blend-multiply" referrerPolicy="no-referrer" />
@@ -822,21 +869,42 @@ export default function App() {
                           DL SIGNATURE
                         </div>
                       </div>
-                      <span className="text-[8px] font-bold font-mono text-slate-450 pr-0.5">
-                        {`REV ${formData.issue_date ? formData.issue_date.substring(5, 7) + '/' + formData.issue_date.substring(2, 4) : '08/09'}`}
-                      </span>
                     </div>
                   </div>
 
-                  {/* Feature 3 — Bottom text: human readable text strip */}
-                  <div className="border-t border-dashed border-slate-200 pt-1.5 bg-slate-50/90 rounded-md">
-                    <div className="font-mono text-[9px] text-slate-600 leading-tight text-center select-all whitespace-pre-wrap">
-                      {`SEX ${formData.sex}  HAIR ${formData.hair_color || 'BLK'}  EYES ${formData.eye_color || 'BRN'}\n`}
-                      {`HGT ${formData.height_feet}'${formData.height_inches}"  WGT ${formData.weight || '160'} lb  ISS ${formatDateMMDDYYYY(formData.issue_date || 'NONE')}\n`}
-                      {`DD ${formData.document_discriminator || '0000000000'}  ISS ${formatDateMMDDYYYY(formData.issue_date || 'NONE')}`}
-                    </div>
-                  </div>
+                  {/* Feature 3 — Bottom text: human readable text strip with right spacing for Rev date */}
+                  {(() => {
+                    const hgtVal = formatHeightDisplay(convertHeight(`${formData.height_feet || "5"}'${formData.height_inches || "11"}`));
+                    const sexVal = formatSexDisplay(formData.sex === 'M' ? '1' : '2');
+                    const hairVal = formData.hair_color || 'BLK';
+                    const eyeVal = formData.eye_color || 'BRN';
+                    const wgtVal = formData.weight || '160';
+                    const issueDateNoDash = formatDateAAMVA(formData.issue_date);
+                    const issueDateDisplay = formatIssueDateDisplay(issueDateNoDash);
 
+                    const line1 = `SEX ${sexVal}   HAIR ${hairVal}   EYES ${eyeVal}   HGT ${hgtVal}   WGT ${wgtVal} lb   ISS ${issueDateDisplay}`;
+                    const docDisc = formData.document_discriminator || '0000000000';
+                    const stateUpper = (formData.state_code || 'VA').toUpperCase();
+                    const auditNum = getAuditNumber();
+                    const line2 = `DD ${issueDateNoDash} ${docDisc}/${stateUpper}FD/${auditNum}    ISS ${issueDateDisplay}`;
+
+                    return (
+                      <div className="mr-28" style={{ marginLeft: '8px' }}>
+                        <div className="font-mono text-[10px] text-[#333333] leading-normal text-left select-all whitespace-pre">
+                          {`${line1}\n${line2}`}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                </div>
+
+                {/* Rev date: absolute bottom-right, 10px margin from edges */}
+                <div 
+                  className="absolute bottom-[10px] right-[10px] font-mono z-30 pointer-events-none select-none font-bold"
+                  style={{ fontSize: '11px', color: '#444444' }}
+                >
+                  {getRevDate()}
                 </div>
               </motion.div>
             </AnimatePresence>
