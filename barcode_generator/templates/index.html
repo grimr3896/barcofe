@@ -24,9 +24,15 @@
             <form action="/generate" method="POST" id="form">
                 <div class="form-grid">
                     <!-- Licence Number -->
-                    <div class="form-group col-span-2">
+                    <div class="form-group">
                         <label for="license_number">Licence Number *</label>
                         <input type="text" id="license_number" name="license_number" required placeholder="DL-XXXX-XXXX" value="{{ data.license_number if data else '' }}">
+                    </div>
+
+                    <!-- Issuer ID Number -->
+                    <div class="form-group">
+                        <label for="iin">Issuer ID Number (IIN) *</label>
+                        <input type="text" id="iin" name="iin" required placeholder="636055" value="{{ data.iin if data else '636055' }}">
                     </div>
 
                     <!-- First Name -->
@@ -107,19 +113,44 @@
                         <input type="text" id="revision_date" name="revision_date" readonly value="{{ data.revision_date if data else '' }}">
                     </div>
 
+                    <!-- Document Discriminator -->
+                    <div class="form-group col-span-2">
+                        <label for="document_discriminator">Document Discriminator (DCF)</label>
+                        <input type="text" id="document_discriminator" name="document_discriminator" readonly style="background-color: #f3f4f6;" value="{{ data.document_discriminator if data else 'Auto-Generated on submit' }}">
+                    </div>
+
                     <!-- Sex -->
                     <div class="form-group">
                         <label for="sex">Sex</label>
                         <select id="sex" name="sex">
-                            <option value="M" {% if data and data.sex == 'M' %}selected{% endif %}>M</option>
-                            <option value="F" {% if data and data.sex == 'F' %}selected{% endif %}>F</option>
+                            <option value="1" {% if data and data.sex == '1' %}selected{% endif %}>Male</option>
+                            <option value="2" {% if data and data.sex == '2' %}selected{% endif %}>Female</option>
+                            <option value="9" {% if data and data.sex == '9' %}selected{% endif %}>Unknown</option>
                         </select>
                     </div>
 
                     <!-- Height -->
                     <div class="form-group">
-                        <label for="height">Height</label>
-                        <input type="text" id="height" name="height" value="{{ data.height if data else '5\'11\"' }}">
+                        <label>Height</label>
+                        <div style="display: flex; gap: 8px;">
+                            <select id="height_feet" name="height_feet" style="flex: 1;">
+                                <option value="4" {% if data and data.height_feet == '4' %}selected{% endif %}>4'</option>
+                                <option value="5" {% if data and data.height_feet == '5' or not data %}selected{% endif %}>5'</option>
+                                <option value="6" {% if data and data.height_feet == '6' %}selected{% endif %}>6'</option>
+                                <option value="7" {% if data and data.height_feet == '7' %}selected{% endif %}>7'</option>
+                            </select>
+                            <select id="height_inches" name="height_inches" style="flex: 1;">
+                                {% for i in range(12) %}
+                                <option value="{{ i }}" {% if data and data.height_inches == (i|string) %}selected{% elif not data and i == 11 %}selected{% endif %}>{{ i }}"</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Weight -->
+                    <div class="form-group">
+                        <label for="weight">Weight (lbs)</label>
+                        <input type="text" id="weight" name="weight" placeholder="160" value="{{ data.weight if (data and data.weight) else '' }}">
                     </div>
 
                     <!-- Eye Color -->
@@ -215,7 +246,7 @@
                                 <div style="font-weight: bold; color: #666666; margin-bottom: 4px;">Track 2:</div>
                                 <div style="word-break: break-all; margin-bottom: 12px; background: #eef1f6; padding: 6px 10px; border-radius: 4px; border: 1px solid #d1d5db;">{{ data.magnetic_track_2 }}</div>
                                 
-                                <div style="font-weight: bold; color: #666666; margin-bottom: 4px;">Printed Code:</div>
+                                <div style="font-weight: bold; color: #666666; margin-bottom: 4px;">Printed on card (top left):</div>
                                 <div style="word-break: break-all; background: #eef1f6; padding: 6px 10px; border-radius: 4px; border: 1px solid #d1d5db;">{{ data.magnetic_track_1 }}{{ data.magnetic_track_2 }}</div>
                             </div>
                             <a href="/download/track" class="btn-action" style="background-color: #22863a; color: white; border: none; font-weight: bold; padding: 10px 24px; font-size: 13px; text-decoration: none; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; display: inline-flex; align-items: center; gap: 8px; width: fit-content; margin-top: 4px;">

@@ -96,7 +96,7 @@ def save_outputs_helper(data):
 def index():
     import random
     from datetime import date
-    from encoder import format_track_expiry, format_track_dob
+    from encoder import format_track_expiry, format_track_dob, clean_license_number
     
     seq_num = str(random.randint(100000, 999999))
     rev_date = date.today().strftime("%m/%d/%Y")
@@ -114,8 +114,10 @@ def index():
         "city": "RUIRU",
         "county": "NAIROBI",
         "zip": "00233",
-        "sex": "M",
-        "height": "5'11\"",
+        "sex": "1",
+        "height_feet": "5",
+        "height_inches": "11",
+        "height": "5'11",
         "eye_color": "BRN",
         "hair_color": "BLK",
         "category": "C",
@@ -124,17 +126,20 @@ def index():
         "country": "KENYA",
         "sequence_number": seq_num,
         "revision_date": rev_date,
+        "iin": "636055",
+        "weight": "160",
+        "document_discriminator": "1234567890",
     }
     
     # Add magnetic tracks initial values
-    st_code = "NA" # Nairobi -> NA
-    lic = "DL-2024-00412"
+    iin = "636055"
+    lic = clean_license_number("DL-2024-00412")
     last = "MWANGI"
     first = "JOHN"
     exp_yy = format_track_expiry("2026-12-31")
     dob_yy = format_track_dob("1995-03-14")
     
-    data["magnetic_track_1"] = f"%{st_code}{lic}^{last}/{first}^{exp_yy}?"
+    data["magnetic_track_1"] = f"%{iin}{lic}^{last}/{first}^{exp_yy}?"
     data["magnetic_track_2"] = f";{lic}={exp_yy}{dob_yy}?"
     data["magnetic_track"] = f"Track 1: {data['magnetic_track_1']}\nTrack 2: {data['magnetic_track_2']}"
     
@@ -146,7 +151,7 @@ def index():
 def generate():
     import random
     from datetime import date
-    from encoder import format_track_expiry, format_track_dob
+    from encoder import format_track_expiry, format_track_dob, clean_license_number
     
     # Read/generate sequence_number
     seq_num = request.form.get("sequence_number")
@@ -158,26 +163,37 @@ def generate():
     if not rev_date:
         rev_date = date.today().strftime("%m/%d/%Y")
         
-    county = request.form.get("county", "CA")
-    st_code = str(county).strip().upper()
-    if len(st_code) > 2:
-        st_code = st_code[:2]
-    elif not st_code or st_code == "NONE":
-         st_code = "CA"
+    iin = request.form.get("iin", "636055").strip()
+    if not iin:
+        iin = "636055"
          
     lic = str(request.form.get("license_number", "")).strip().upper()
+    lic_clean = clean_license_number(lic)
     last = str(request.form.get("last_name", "")).strip().upper()
     first = str(request.form.get("first_name", "")).strip().upper()
+    
     exp_yy = format_track_expiry(request.form.get("expiry_date", ""))
     dob_yy = format_track_dob(request.form.get("dob", ""))
     
-    mag_track_1 = f"%{st_code}{lic}^{last}/{first}^{exp_yy}?"
-    mag_track_2 = f";{lic}={exp_yy}{dob_yy}?"
+    mag_track_1 = f"%{iin}{lic_clean}^{last}/{first}^{exp_yy}?"
+    mag_track_2 = f";{lic_clean}={exp_yy}{dob_yy}?"
+    
+    h_feet = request.form.get("height_feet", "5")
+    h_inches = request.form.get("height_inches", "11")
+    combined_height = f"{h_feet}'{h_inches}"
+    
+    # Sex handling (from form: 1/2/9)
+    sex_form = request.form.get("sex", "1")
+    
+    # Handle read-only or auto-generated document discriminator
+    doc_disc = request.form.get("document_discriminator", "").strip()
+    if not doc_disc or doc_disc == "Auto-Generated on submit":
+        doc_disc = str(random.randint(1000000000, 9999999999))
     
     data = {
-        "license_number": request.form.get("license_number", ""),
-        "last_name": request.form.get("last_name", ""),
-        "first_name": request.form.get("first_name", ""),
+        "license_number": lic,
+        "last_name": last,
+        "first_name": first,
         "middle_name": request.form.get("middle_name", ""),
         "dob": request.form.get("dob", ""),
         "issue_date": request.form.get("issue_date", ""),
@@ -186,16 +202,21 @@ def generate():
         "city": request.form.get("city", ""),
         "county": request.form.get("county", ""),
         "zip": request.form.get("zip", ""),
-        "sex": request.form.get("sex", "M"),
-        "height": request.form.get("height", "5'11\""),
+        "sex": sex_form,
+        "height_feet": h_feet,
+        "height_inches": h_inches,
+        "height": combined_height,
         "eye_color": request.form.get("eye_color", "BRN"),
         "hair_color": request.form.get("hair_color", "BLK"),
         "category": request.form.get("category", "C"),
         "restrictions": request.form.get("restrictions", "NONE"),
         "endorsements": request.form.get("endorsements", "NONE"),
-        "country": request.form.get("country", "KENYA"),
+        "country": request.form.get("country", "USA"),
         "sequence_number": seq_num,
         "revision_date": rev_date,
+        "iin": iin,
+        "weight": request.form.get("weight", "160"),
+        "document_discriminator": doc_disc,
         "magnetic_track_1": mag_track_1,
         "magnetic_track_2": mag_track_2,
         "magnetic_track": f"Track 1: {mag_track_1}\nTrack 2: {mag_track_2}"

@@ -6,24 +6,22 @@ FIELD_ORDER = (
     ("DAC", "first_name"),
     ("DAD", "middle_name"),
     ("DBB", "dob"),
-    ("DBD", "issue_date"),
     ("DBA", "expiry_date"),
+    ("DBC", "sex"),
+    ("DAY", "eye_color"),
+    ("DAU", "height"),
     ("DAG", "address"),
     ("DAI", "city"),
     ("DAJ", "county"),
     ("DAK", "zip"),
-    ("DBC", "sex"),
-    ("DAU", "height"),
-    ("DAY", "eye_color"),
+    ("DCF", "document_discriminator"),
+    ("DCG", "country"),
+    ("DCA", "vehicle_class"),
+    ("DCB", "restrictions"),
+    ("DCD", "endorsements"),
+    ("DBD", "issue_date"),
     ("DAZ", "hair_color"),
-    ("DCA", "vehicle_class"),      # DCA vehicle_class
-    ("DCB", "restrictions"),       # DCB restrictions
-    ("DCD", "endorsements"),       # DCD endorsements
-    ("DCT", "magnetic_track_1"),   # DCT track 1 string
-    ("DCU", "magnetic_track_2"),   # DCU track 2 string
-    ("DCM", "sequence_number"),    # DCM inventory number
-    ("DCN", "revision_date"),      # DCN card revision date
-    ("DCG", "country"),            # DCG country
+    ("DAW", "weight"),
 )
 
 REQUIRED_FIELDS = ("license_number", "last_name", "first_name", "dob")
@@ -51,40 +49,93 @@ def format_date_to_yymmdd(date_str):
     return yyyymmdd
 
 def format_date_aamva(date_str: str) -> str:
-    if not date_str or date_str == "NONE":
-        return "NONE"
+    if not date_str:
+        return ""
+    date_str = str(date_str).strip()
+    if date_str.upper() in ("NONE", ""):
+        return ""
+    
     # Handle YYYY-MM-DD input from HTML date picker
     if "-" in date_str:
         parts = date_str.split("-")
         if len(parts) == 3:
             year, month, day = parts
-            return f"{month}{day}{year}"
+            return f"{month.zfill(2)}{day.zfill(2)}{year}"
+    
     # Handle MM/DD/YYYY input
     if "/" in date_str:
         parts = date_str.split("/")
         if len(parts) == 3:
             month, day, year = parts
+            return f"{month.zfill(2)}{day.zfill(2)}{year}"
+            
+    # Remove separators to check digits
+    cleaned = re.sub(r'[\/-]', '', date_str)
+    if len(cleaned) == 8:
+        # Check if first 4 is year (e.g. 19950314 -> YYYYMMDD)
+        if int(cleaned[:4]) > 1300:
+            year = cleaned[:4]
+            month = cleaned[4:6]
+            day = cleaned[6:]
             return f"{month}{day}{year}"
-    # Already in MMDDYYYY format — return as is
-    return date_str
+        else:
+            return cleaned
+    return cleaned
 
 def format_track_expiry(date_str: str) -> str:
-    # Input: YYYY-MM-DD
-    # Output: YYMM
+    if not date_str:
+        return ""
+    date_str = str(date_str).strip()
+    if date_str.upper() in ("NONE", ""):
+        return ""
+    # Handle YYYY-MM-DD
     if "-" in date_str:
         parts = date_str.split("-")
-        year, month = parts[0][2:], parts[1]
-        return f"{year}{month}"
+        if len(parts) == 3:
+            return f"{parts[0][2:]}{parts[1]}"
+    # Handle MM/DD/YYYY
+    if "/" in date_str:
+        parts = date_str.split("/")
+        if len(parts) == 3:
+            return f"{parts[2][2:]}{parts[0]}"
+    # Handle MMDDYYYY
+    if len(date_str) == 8:
+        return f"{date_str[6:]}{date_str[:2]}"
     return date_str
 
 def format_track_dob(date_str: str) -> str:
-    # Input: YYYY-MM-DD
-    # Output: YYMMDD
+    if not date_str:
+        return ""
+    date_str = str(date_str).strip()
+    if date_str.upper() in ("NONE", ""):
+        return ""
+    # Handle YYYY-MM-DD
     if "-" in date_str:
         parts = date_str.split("-")
-        year, month, day = parts[0][2:], parts[1], parts[2]
-        return f"{year}{month}{day}"
+        if len(parts) == 3:
+            return f"{parts[0][2:]}{parts[1]}{parts[2]}"
+    # Handle MM/DD/YYYY
+    if "/" in date_str:
+        parts = date_str.split("/")
+        if len(parts) == 3:
+            return f"{parts[2][2:]}{parts[0].zfill(2)}{parts[1].zfill(2)}"
+    # Handle MMDDYYYY
+    if len(date_str) == 8:
+        return f"{date_str[6:]}{date_str[:2]}{date_str[2:4]}"
     return date_str
+
+def convert_height(height_str: str) -> str:
+    # Handle 5'11" or 5'11 format
+    match = re.match(r"(\d+)'(\d+)", height_str)
+    if match:
+        feet = int(match.group(1))
+        inches = int(match.group(2))
+        total_inches = (feet * 12) + inches
+        return f"{total_inches:03d} in"
+    # Already in correct format e.g. 071 in
+    if "in" in height_str:
+        return height_str
+    return height_str
 
 def extract_code(val):
     if not val or str(val).strip().upper() in ("NONE", ""):
@@ -106,134 +157,116 @@ def get_iin(country, state):
     return "636014"
 
 def build_encoded_text(data):
-    country = str(data.get("country", "KENYA")).upper()
-    state = str(data.get("county", "NONE")).upper()
-    iin = get_iin(country, state)
-    
-    version = "11"
-    jversion = "00"
-    num_subfiles = "01"
-    subfile_type = "DL"
+    iin = str(data.get("iin", "636055")).strip()
+    if not iin:
+        iin = "636055"
     
     elements = []
     
-    def get_f(val):
-         if val is None:
-              return "NONE"
-         val_str = str(val).strip().upper()
-         return val_str if val_str else "NONE"
-         
-    # 1. License Number
+    # 1. DAQ - license_number
     lic = clean_license_number(data.get("license_number", ""))
-    if len(lic) < 8:
-         lic = lic.ljust(8, "0")
-    if len(lic) > 18:
-         lic = lic[:18]
-    elements.append(f"DAQ{lic}")
+    elements.append(f"DAQ {lic}")
     
-    # 2. Name (Last, First, Middle) -> Rule 3
-    last = get_f(data.get("last_name", ""))
-    first = get_f(data.get("first_name", ""))
-    mid_raw = str(data.get("middle_name", "")).strip().upper()
-    mid = mid_raw if (mid_raw and mid_raw != "NONE") else ""
-    name_val = f"{last},{first},{mid}"
-    elements.append(f"DAA{name_val}")
+    # 2. DCS - last_name
+    last = str(data.get("last_name", "")).strip().upper()
+    elements.append(f"DCS {last}")
     
-    # 3. Date of Birth
-    elements.append(f"DBB{format_date_aamva(data.get('dob', ''))}")
+    # 3. DAC - first_name
+    first = str(data.get("first_name", "")).strip().upper()
+    elements.append(f"DAC {first}")
     
-    # 4. Issue Date
-    elements.append(f"DBD{format_date_aamva(data.get('issue_date', ''))}")
+    # 4. DAD - middle_name
+    mid = str(data.get("middle_name", "")).strip().upper()
+    if mid and mid != "NONE":
+        elements.append(f"DAD {mid}")
     
-    # 5. Expiry Date
-    elements.append(f"DBA{format_date_aamva(data.get('expiry_date', ''))}")
+    # 5. DBB - dob
+    dob = format_date_aamva(data.get("dob", ""))
+    elements.append(f"DBB {dob}")
     
-    # 6. Address
-    street = get_f(data.get("address", ""))
-    city = get_f(data.get("city", ""))
-    state_val = get_f(data.get("county", ""))
-    zip_val = get_f(data.get("zip", ""))
-    address_val = f"{street},{city},{state_val},{zip_val}"
-    elements.append(f"DAG{address_val}")
+    # 6. DBA - expiry_date
+    exp = format_date_aamva(data.get("expiry_date", ""))
+    elements.append(f"DBA {exp}")
     
-    # 7. City
-    elements.append(f"DAI{city}")
+    # 7. DBC - sex
+    raw_sex = str(data.get("sex", "M")).strip().upper()
+    if raw_sex in ("M", "1"):
+        sex_val = "1"
+    elif raw_sex in ("F", "2"):
+        sex_val = "2"
+    else:
+        sex_val = "9"
+    elements.append(f"DBC {sex_val}")
     
-    # 8. State/Province
-    elements.append(f"DAJ{state_val}")
+    # 8. DAY - eye_color
+    eye = str(data.get("eye_color", "BRN")).strip().upper()
+    elements.append(f"DAY {eye}")
     
-    # 9. ZIP/Postal Code
-    elements.append(f"DAK{zip_val}")
+    # 9. DAU - height
+    height = convert_height(str(data.get("height", "5'11")))
+    elements.append(f"DAU {height}")
     
-    # 10. Sex (M/F)
-    sex_val = get_f(data.get("sex", "M"))
-    if sex_val not in ("M", "F"):
-         sex_val = "M"
-    elements.append(f"DBC{sex_val}")
+    # 10. DAG - address
+    addr = str(data.get("address", "")).strip().upper()
+    elements.append(f"DAG {addr}")
     
-    # 11. Height
-    elements.append(f"DAU{get_f(data.get('height', ''))}")
+    # 11. DAI - city
+    city = str(data.get("city", "")).strip().upper()
+    elements.append(f"DAI {city}")
     
-    # 12. Eye Color
-    elements.append(f"DAY{get_f(data.get('eye_color', ''))}")
+    # 12. DAJ - county
+    county = str(data.get("county", "")).strip().upper()
+    elements.append(f"DAJ {county}")
     
-    # 13. Hair Color
-    elements.append(f"DAZ{get_f(data.get('hair_color', ''))}")
+    # 13. DAK - zip
+    zip_code = str(data.get("zip", "")).strip().upper()
+    elements.append(f"DAK {zip_code}")
     
-    # 14. Class -> Rule 7
-    class_code = extract_code(data.get("vehicle_class", data.get("category", "C")))
-    if class_code == "NONE":
-         class_code = "C"
-    elements.append(f"DCA{class_code}")
+    # 14. DCF - document_discriminator
+    dcf = str(data.get("document_discriminator", "")).strip().upper()
+    if not dcf:
+        import random
+        dcf = str(random.randint(1000000000, 9999999999))
+    elements.append(f"DCF {dcf}")
     
-    # 15. Restrictions -> Rule 8
-    restr_code = extract_code(data.get("restrictions", "NONE"))
-    elements.append(f"DCB{restr_code}")
+    # 15. DCG - country
+    country = str(data.get("country", "USA")).strip().upper()
+    elements.append(f"DCG {country}")
     
-    # 16. Endorsements -> Rule 8
-    end_code = extract_code(data.get("endorsements", "NONE"))
-    elements.append(f"DCD{end_code}")
+    # 16. DCA - vehicle_class
+    v_class = extract_code(data.get("vehicle_class", data.get("category", "C")))
+    if not v_class or v_class == "NONE":
+        v_class = "C"
+    elements.append(f"DCA {v_class}")
     
-    # 17. Magnetic Track 1 (New)
-    track1 = data.get("magnetic_track_1")
-    if not track1:
-         st_code = str(data.get("county", "CA")).strip().upper()
-         if len(st_code) > 2:
-              st_code = st_code[:2]
-         elif not st_code or st_code == "NONE":
-              st_code = "CA"
-         t1_lic = clean_license_number(data.get("license_number", ""))
-         t1_last = str(data.get("last_name", "")).strip().upper()
-         t1_first = str(data.get("first_name", "")).strip().upper()
-         t1_exp = format_track_expiry(data.get("expiry_date", ""))
-         track1 = f"%{st_code}{t1_lic}^{t1_last}/{t1_first}^{t1_exp}?"
-    elements.append(f"DCT{track1}")
+    # 17. DCB - restrictions
+    restr = extract_code(data.get("restrictions", "NONE"))
+    elements.append(f"DCB {restr}")
     
-    # 18. Magnetic Track 2 (New)
-    track2 = data.get("magnetic_track_2")
-    if not track2:
-         t2_lic = clean_license_number(data.get("license_number", ""))
-         t2_exp = format_track_expiry(data.get("expiry_date", ""))
-         t2_dob = format_track_dob(data.get("dob", ""))
-         track2 = f";{t2_lic}={t2_exp}{t2_dob}?"
-    elements.append(f"DCU{track2}")
+    # 18. DCD - endorsements
+    ends = extract_code(data.get("endorsements", "NONE"))
+    elements.append(f"DCD {ends}")
     
-    # 19. Inventory Number (New)
-    seq_num = str(data.get("sequence_number", "121586")).strip().upper()
-    elements.append(f"DCM{seq_num}")
+    # 19. DBD - issue_date
+    iss = format_date_aamva(data.get("issue_date", ""))
+    elements.append(f"DBD {iss}")
     
-    # 20. Card Revision Date (New)
-    rev_date = str(data.get("revision_date", "06/20/2026")).strip().upper()
-    elements.append(f"DCN{rev_date}")
+    # 20. DAZ - hair_color
+    hair = str(data.get("hair_color", "BLK")).strip().upper()
+    elements.append(f"DAZ {hair}")
     
-    # Join subfile parts
-    subfile_data = f"{subfile_type}\r{'\n'.join(elements)}\n"
+    # 21. DAW - weight
+    weight = str(data.get("weight", "160")).strip().upper()
+    elements.append(f"DAW {weight}")
+    
+    subfile_type = "DL"
+    subfile_data = f"{subfile_type}\n{'\n'.join(elements)}\n"
     
     # Calculate offset and length
     offset_str = "0031"
-    length_str = str(len(subfile_data)).zfill(4)
+    length_str = f"{len(subfile_data):04d}"
     
-    # Compliance Indicator (@) + Separator (\n) + Record Separator (\u001e) + Segment Terminator (\r) + File Type (ANSI )
-    header = f"@\n\x1e\rANSI {iin}{version}{jversion}{num_subfiles}{subfile_type}{offset_str}{length_str}"
+    # Header: Compliance Indicator (@) + Separator (\n) + Record Separator (\u001e) + Segment Terminator (\r) + File Type (ANSI ) + ...
+    header = f"@\n\x1e\rANSI {iin}010101DL0031{length_str}"
     
     return f"{header}{subfile_data}"

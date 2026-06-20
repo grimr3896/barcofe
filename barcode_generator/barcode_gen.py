@@ -141,16 +141,16 @@ def generate_barcode_layout_image(text, data, filepath="output/barcode_layout.pn
     printed_track = f"{t1}{t2}"
     font_printed = load_custom_font(18, is_bold=True)
     track_w = get_text_width(draw, printed_track, font_printed)
-    box_x1 = 40
-    box_y1 = 12
-    box_x2 = 40 + int(track_w) + 20
-    box_y2 = 12 + 32
+    box_x1 = 20
+    box_y1 = 8
+    box_x2 = box_x1 + int(track_w) + 16
+    box_y2 = box_y1 + 32
     try:
-        draw.rounded_rectangle([(box_x1, box_y1), (box_x2, box_y2)], radius=5, outline="#cccccc", width=2)
+        draw.rounded_rectangle([(box_x1, box_y1), (box_x2, box_y2)], radius=4, outline="#cccccc", width=1)
     except AttributeError:
-        draw.rectangle([(box_x1, box_y1), (box_x2, box_y2)], outline="#cccccc", width=2)
+        draw.rectangle([(box_x1, box_y1), (box_x2, box_y2)], outline="#cccccc", width=1)
     
-    draw.text((50, 17), printed_track, fill="black", font=font_printed)
+    draw.text((box_x1 + 8, box_y1 + 6), printed_track, fill="#000000", font=font_printed)
 
     # 1. Black magnetic stripe bar (height 40px, shifted to y=55 to y=95)
     draw.rectangle([(0, 55), (1200, 95)], fill="black")
