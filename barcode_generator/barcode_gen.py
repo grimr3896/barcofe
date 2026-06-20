@@ -1,6 +1,10 @@
 import os
+import io
+from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 from pdf417 import encode, render_image
+from barcode import Code128
+from barcode.writer import ImageWriter
 
 def generate_barcode_image(text, filepath="output/barcode.png"):
     # Change ONLY these parameters in generate_barcode_image():
@@ -54,11 +58,33 @@ def load_custom_font(font_size, is_bold=True):
             pass
     return ImageFont.load_default()
 
+def generate_code128_image(
+    license_number: str,
+    output_path: str | Path,
+) -> Image.Image:
+    buffer = io.BytesIO()
+    code = Code128(license_number, writer=ImageWriter())
+    code.write(buffer, options={
+        "module_width": 0.4,
+        "module_height": 8.0,
+        "font_size": 7,
+        "text_distance": 3.0,
+        "quiet_zone": 4.0,
+        "dpi": 300,
+        "write_text": True,
+    })
+    buffer.seek(0)
+    image = Image.open(buffer).convert("RGB")
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    image.save(output, dpi=(300, 300))
+    return image
+
 def generate_barcode_layout_image(text, data, filepath="output/barcode_layout.png"):
-    # Fixed dimension background: 1200 x 400 pixels
-    layout_img = Image.new("RGB", (1200, 400), "white")
+    # Fixed dimension background: 1200 x 500 pixels
+    layout_img = Image.new("RGB", (1200, 500), "white")
     
-    # 1. Barcode section
+    # 1. Barcode section (PDF417)
     # Generate the barcode at Columns: 16, Scale: 5, ECL: 5, Padding: 0
     codes = encode(text, columns=16, security_level=5)
     barcode_img = render_image(codes, scale=5, padding=0)
@@ -90,22 +116,43 @@ def generate_barcode_layout_image(text, data, filepath="output/barcode_layout.pn
     x_middle = max(0, (1200 - text_w) // 2)
     draw.text((x_middle, 310), text_middle, fill="#1a1a1a", font=font_middle)
     
-    # 3. Bottom strip
-    # Draw separating line (2px, #cccccc)
-    draw.line([(40, 355), (1160, 355)], fill="#cccccc", width=2)
+    # 3. Divider line between sections (2px, #cccccc)
+    draw.line([(40, 340), (1160, 340)], fill="#cccccc", width=2)
     
-    # Below line text (font size 22px, color #666666) at y = 365
+    # Below line text (font size 22px, color #666666) at y = 350
     font_bottom = load_custom_font(22, is_bold=False)
     
     # Left: country/organisation name
     org_name = data.get("country", "KENYA").strip().upper() or "KENYA"
-    draw.text((40, 365), org_name, fill="#666666", font=font_bottom)
+    draw.text((40, 350), org_name, fill="#666666", font=font_bottom)
     
     # Right: expiry date
     expiry_date = data.get("expiry_date", "").strip().upper()
     expiry_text = f"EXPIRY: {expiry_date}" if expiry_date else "EXPIRY: N/A"
     exp_w = get_text_width(draw, expiry_text, font_bottom)
-    draw.text((1160 - exp_w, 365), expiry_text, fill="#666666", font=font_bottom)
+    draw.text((1160 - exp_w, 350), expiry_text, fill="#666666", font=font_bottom)
+    
+    # 4. Code 128 section (bottom 160px, centered horizontally)
+    # Label above Code 128: "LICENCE NUMBER" in small caps
+    font_label = load_custom_font(18, is_bold=True)
+    label_text = "LICENCE NUMBER"
+    label_w = get_text_width(draw, label_text, font_label)
+    draw.text((max(0, (1200 - label_w) // 2), 380), label_text, fill="#1a1a1a", font=font_label)
+    
+    # Centered Code 128 barcode (width: 400px max, height: 80px)
+    try:
+        code128_path = os.path.join("output", "code128.png")
+        code128_img = generate_code128_image(license_number, code128_path)
+        
+        try:
+            resample_lanczos = Image.Resampling.LANCZOS
+        except AttributeError:
+            resample_lanczos = Image.ANTIALIAS
+            
+        code128_resized = code128_img.resize((400, 80), resample_lanczos)
+        layout_img.paste(code128_resized, (400, 405))
+    except Exception as e:
+        print(f"Failed to generate or paste Code128: {e}")
     
     # Ensure folder path exists
     directory = os.path.dirname(filepath)

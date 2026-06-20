@@ -1,0 +1,4 @@
+flask
+pdf417
+Pillow
+python-barcode

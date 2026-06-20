@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 // @ts-ignore
 import { PDF417 } from "pdf417-generator";
+// @ts-ignore
+import JsBarcode from "jsbarcode";
 
 // Exact Form Fields with defaults
 const INITIAL_FORM_DATA = {
@@ -74,6 +76,8 @@ export default function App() {
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const printCanvasRef = useRef<HTMLCanvasElement>(null);
+  const code128CanvasRef = useRef<HTMLCanvasElement>(null);
+  const printCode128CanvasRef = useRef<HTMLCanvasElement>(null);
 
   // Field change handler
   const handleInputChange = (key: string, value: string) => {
@@ -86,8 +90,16 @@ export default function App() {
   // Form encoded text builder
   const buildEncodedText = (data: typeof INITIAL_FORM_DATA) => {
     return FIELD_ORDER.map(([prefix, fieldKey]) => {
-      const val = data[fieldKey as keyof typeof INITIAL_FORM_DATA] || "";
-      return `${prefix}: ${val}`;
+      let val = data[fieldKey as keyof typeof INITIAL_FORM_DATA];
+      if (val === undefined || val === null) {
+        val = "NONE";
+      } else {
+        val = val.trim();
+        if (val === "") {
+          val = "NONE";
+        }
+      }
+      return `${prefix} ${val}`;
     }).join("\n");
   };
 
@@ -171,6 +183,46 @@ export default function App() {
 
     setIsGenerated(true);
     setGenerationTime(new Date().toLocaleTimeString());
+
+    // Generate Code 128
+    setTimeout(() => {
+      if (code128CanvasRef.current && formData.license_number) {
+        try {
+          JsBarcode(code128CanvasRef.current, formData.license_number, {
+            format: "CODE128",
+            width: 1.5,
+            height: 50,
+            displayValue: true,
+            fontSize: 12,
+            font: "monospace",
+            textMargin: 4,
+            background: "#ffffff",
+            lineColor: "#000000",
+            margin: 10,
+          });
+        } catch (e) {
+          console.error("Code128 draw failed", e);
+        }
+      }
+      if (printCode128CanvasRef.current && formData.license_number) {
+        try {
+          JsBarcode(printCode128CanvasRef.current, formData.license_number, {
+            format: "CODE128",
+            width: 2.5,
+            height: 80,
+            displayValue: true,
+            fontSize: 14,
+            font: "monospace",
+            textMargin: 6,
+            background: "#ffffff",
+            lineColor: "#000000",
+            margin: 15,
+          });
+        } catch (e) {
+          console.error("Print Code128 draw failed", e);
+        }
+      }
+    }, 50);
   };
 
   // Trigger initial render
@@ -178,13 +230,67 @@ export default function App() {
     triggerGeneration();
   }, [aspectRatio, inkColor, devicePixelRatio]);
 
-  // Save/Download Action
+  // Code 128 rendering effect
+  useEffect(() => {
+    if (isGenerated && formData.license_number) {
+      if (code128CanvasRef.current) {
+        try {
+          JsBarcode(code128CanvasRef.current, formData.license_number, {
+            format: "CODE128",
+            width: 1.5,
+            height: 50,
+            displayValue: true,
+            fontSize: 12,
+            font: "monospace",
+            textMargin: 4,
+            background: "#ffffff",
+            lineColor: "#000000",
+            margin: 10,
+          });
+        } catch (e) {
+          console.error("Code128 useEffect draw failed", e);
+        }
+      }
+      if (printCode128CanvasRef.current) {
+        try {
+          JsBarcode(printCode128CanvasRef.current, formData.license_number, {
+            format: "CODE128",
+            width: 2.5,
+            height: 80,
+            displayValue: true,
+            fontSize: 14,
+            font: "monospace",
+            textMargin: 6,
+            background: "#ffffff",
+            lineColor: "#000000",
+            margin: 15,
+          });
+        } catch (e) {
+          console.error("Print Code128 useEffect draw failed", e);
+        }
+      }
+    }
+  }, [isGenerated, formData.license_number]);
+
+  // Save/Download Action for PDF417
   const handleDownloadPNG = () => {
     if (!canvasRef.current) return;
     const dataUrl = canvasRef.current.toDataURL("image/png");
     const link = document.createElement("a");
     link.href = dataUrl;
     link.download = `pdf417_${formData.license_number || "barcode"}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Save/Download Action for Code 128
+  const handleDownloadCode128 = () => {
+    if (!code128CanvasRef.current) return;
+    const dataUrl = code128CanvasRef.current.toDataURL("image/png");
+    const link = document.createElement("a");
+    link.href = dataUrl;
+    link.download = `code128_${formData.license_number || "barcode"}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -458,40 +564,70 @@ export default function App() {
         <section className="xl:w-2/5 flex flex-col gap-6">
           
           {/* Bento box 1: LIVE PREVIEW */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col items-center justify-center">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col items-stretch">
             <div className="flex items-center gap-2 mb-4 w-full border-b border-slate-100 pb-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <ShieldCheck className="w-4 h-4 text-[#1a3a6b]" />
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Live Preview</h3>
             </div>
             
-            <AnimatePresence mode="wait">
-              <motion.div
-                id="barcode-preview-box"
-                animate={{ 
-                  scale: isFlashing ? 1.02 : 1,
-                  borderColor: isFlashing ? "#1a3a6b" : "#f1f5f9"
-                }}
-                transition={{ duration: 0.15 }}
-                className="w-full aspect-[3/1] bg-white border-2 border-slate-100 p-3 flex items-center justify-center min-h-[140px] relative overflow-hidden rounded-lg"
-              >
-                {!isGenerated && (
-                  <div className="flex flex-col items-center opacity-40 text-center">
-                    <Barcode className="w-12 h-12 text-slate-400 mb-1" />
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#43474f]">Awaiting Generation...</p>
-                  </div>
-                )}
+            <div className="flex flex-col gap-5">
+              {/* PDF417 Barcode */}
+              <div className="flex flex-col gap-1.5 items-start">
+                <span className="text-[11px] font-bold text-[#1a3a6b] uppercase tracking-wider">PDF417 Barcode (Full Data)</span>
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    id="barcode-preview-box"
+                    animate={{ 
+                      scale: isFlashing ? 1.02 : 1,
+                      borderColor: isFlashing ? "#1a3a6b" : "#f1f5f9"
+                    }}
+                    transition={{ duration: 0.15 }}
+                    className="w-full aspect-[3/1] bg-white border border-slate-200 p-3 flex items-center justify-center min-h-[140px] relative overflow-hidden rounded-lg"
+                  >
+                    {!isGenerated && (
+                      <div className="flex flex-col items-center opacity-40 text-center">
+                        <Barcode className="w-12 h-12 text-slate-400 mb-1" />
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#43474f]">Awaiting Generation...</p>
+                      </div>
+                    )}
 
-                <canvas 
-                  ref={canvasRef} 
-                  className={`max-w-full max-h-full object-contain ${!isGenerated ? "hidden" : "block"}`}
-                />
-              </motion.div>
-            </AnimatePresence>
+                    <canvas 
+                      ref={canvasRef} 
+                      className={`max-w-full max-h-full object-contain ${!isGenerated ? "hidden" : "block"}`}
+                    />
+                  </motion.div>
+                </AnimatePresence>
+                <p className="text-[10px] text-slate-500 font-medium">Encodes all 19 fields — use for full verification</p>
+              </div>
 
-            <div className="mt-4 text-[10px] text-slate-400 font-mono tracking-wider uppercase flex justify-between w-full">
-              <span>Standard: PDF417</span>
+              {/* Code 128 Barcode */}
+              <div className="flex flex-col gap-1.5 items-start border-t border-slate-100 pt-4">
+                <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider font-sans">LICENCE NUMBER (Code 128)</span>
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    id="code128-preview-box"
+                    className="w-full bg-white border border-slate-200 p-3 flex items-center justify-center min-h-[100px] relative overflow-hidden rounded-lg"
+                  >
+                    {!isGenerated && (
+                      <div className="flex flex-col items-center opacity-40 text-center">
+                        <Barcode className="w-12 h-12 text-slate-400 mb-1" />
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#43474f]">Awaiting Generation...</p>
+                      </div>
+                    )}
+
+                    <canvas 
+                      ref={code128CanvasRef} 
+                      className={`max-w-[75%] max-h-full object-contain ${!isGenerated ? "hidden" : "block"}`}
+                    />
+                  </motion.div>
+                </AnimatePresence>
+                <p className="text-[10px] text-slate-500 font-medium font-sans">Encodes licence number only — use for quick lookup</p>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-2 border-t border-slate-100 text-[10px] text-slate-400 font-mono tracking-wider uppercase flex justify-between w-full">
+              <span>Standard: PDF417 & 128</span>
               <span>Cols: 16</span>
-              <span>Scale: {devicePixelRatio}x</span>
               <span>ECL: Level 5</span>
             </div>
           </div>
@@ -500,20 +636,31 @@ export default function App() {
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col gap-4">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Actions</h3>
             
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={handleDownloadPNG}
-                disabled={!isGenerated}
-                className="flex-1 bg-slate-800 text-white rounded-lg flex items-center justify-center gap-3 font-semibold py-3 transition-colors text-xs cursor-pointer hover:bg-slate-950 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]"
-              >
-                <Download className="w-4 h-4" />
-                Download PNG
-              </button>
+            <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  onClick={handleDownloadPNG}
+                  disabled={!isGenerated}
+                  className="flex-1 bg-[#1a3a6b] hover:bg-[#122b50] text-white rounded-lg flex items-center justify-center gap-2 font-semibold py-3 transition-colors text-xs cursor-pointer disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]"
+                >
+                  <Download className="w-4 h-4" />
+                  Download PDF417
+                </button>
+                
+                <button
+                  onClick={handleDownloadCode128}
+                  disabled={!isGenerated}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center justify-center gap-2 font-semibold py-3 transition-colors text-xs cursor-pointer disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]"
+                >
+                  <Download className="w-4 h-4" />
+                  Download Code 128
+                </button>
+              </div>
               
               <button
                 onClick={() => window.print()}
                 disabled={!isGenerated}
-                className="flex-1 border-2 border-[#1a3a6b] text-[#1a3a6b] rounded-lg flex items-center justify-center gap-3 font-semibold py-3 transition-colors text-xs cursor-pointer hover:bg-[#1a3a6b]/5 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]"
+                className="w-full border-2 border-[#1a3a6b] text-[#1a3a6b] rounded-lg flex items-center justify-center gap-2 font-semibold py-3 transition-colors text-xs cursor-pointer hover:bg-[#1a3a6b]/5 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]"
               >
                 <Printer className="w-4 h-4" />
                 Print Barcode
@@ -576,8 +723,18 @@ export default function App() {
             SERIAL: {formData.license_number || "U-REC-EXPORT"} | DATE: {new Date().toLocaleDateString()}
           </div>
           
-          <div className="w-full aspect-[3/1] border border-gray-300 p-2 bg-white flex items-center justify-center">
-            <canvas ref={printCanvasRef} className="max-w-full max-h-full object-contain" />
+          <div className="w-full flex flex-col gap-1 items-center">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">PDF417 Barcode (Full data)</span>
+            <div className="w-full aspect-[3/1] border border-gray-300 p-2 bg-white flex items-center justify-center">
+              <canvas ref={printCanvasRef} className="max-w-full max-h-full object-contain" />
+            </div>
+          </div>
+          
+          <div className="w-full flex flex-col gap-1 items-center mt-2">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Licence Number (Code 128)</span>
+            <div className="w-[80%] aspect-[4/1] border border-gray-300 p-2 bg-white flex items-center justify-center">
+              <canvas ref={printCode128CanvasRef} className="max-w-full max-h-full object-contain" />
+            </div>
           </div>
 
           <table className="w-full text-left font-mono text-[11px] text-slate-600 border-collapse border border-slate-200 mt-2">
