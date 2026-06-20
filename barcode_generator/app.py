@@ -103,18 +103,18 @@ def index():
     
     # Defaults
     data = {
-        "license_number": "DL-2024-00412",
-        "last_name": "MWANGI",
-        "first_name": "JOHN",
-        "middle_name": "KAMAU",
-        "dob": "1995-03-14",
-        "issue_date": "2024-01-10",
-        "expiry_date": "2026-12-31",
-        "address": "123 UNIVERSITY ROAD",
-        "city": "RUIRU",
-        "county": "NAIROBI",
-        "zip": "00233",
-        "sex": "1",
+        "license_number": "T16700285",
+        "last_name": "MAURY",
+        "first_name": "JUSTIN",
+        "middle_name": "WILLIAM",
+        "dob": "1958-07-15",
+        "issue_date": "2009-08-14",
+        "expiry_date": "2017-08-14",
+        "address": "17 FIRST STREET",
+        "city": "STAUNTON",
+        "state_code": "VA",
+        "zip": "24401",
+        "sex": "M",
         "height_feet": "5",
         "height_inches": "11",
         "height": "5'11",
@@ -123,21 +123,22 @@ def index():
         "category": "C",
         "restrictions": "NONE",
         "endorsements": "NONE",
-        "country": "KENYA",
+        "country": "USA",
         "sequence_number": seq_num,
         "revision_date": rev_date,
-        "iin": "636055",
+        "iin": "636014",
         "weight": "160",
-        "document_discriminator": "1234567890",
+        "document_discriminator": "1827364590",
+        "compliance_type": "F",
     }
     
     # Add magnetic tracks initial values
-    iin = "636055"
-    lic = clean_license_number("DL-2024-00412")
-    last = "MWANGI"
-    first = "JOHN"
-    exp_yy = format_track_expiry("2026-12-31")
-    dob_yy = format_track_dob("1995-03-14")
+    iin = "636014"
+    lic = clean_license_number("T16700285")
+    last = "MAURY"
+    first = "JUSTIN"
+    exp_yy = format_track_expiry("2017-08-14")
+    dob_yy = format_track_dob("1958-07-15")
     
     data["magnetic_track_1"] = f"%{iin}{lic}^{last}/{first}^{exp_yy}?"
     data["magnetic_track_2"] = f";{lic}={exp_yy}{dob_yy}?"
@@ -153,75 +154,92 @@ def generate():
     from datetime import date
     from encoder import format_track_expiry, format_track_dob, clean_license_number
     
-    # Read/generate sequence_number
-    seq_num = request.form.get("sequence_number")
-    if not seq_num:
-        seq_num = str(random.randint(100000, 999999))
-        
-    # Read/generate revision_date
-    rev_date = request.form.get("revision_date")
-    if not rev_date:
-        rev_date = date.today().strftime("%m/%d/%Y")
-        
-    iin = request.form.get("iin", "636055").strip()
-    if not iin:
-        iin = "636055"
-         
+    person = {}
+    
+    # 1. Auto-generate document_discriminator:
+    person["document_discriminator"] = str(
+        random.randint(1000000000, 9999999999)
+    )
+    
+    # 2. Set compliance_type default:
+    person["compliance_type"] = "F"
+    
+    # 3. Set country default:
+    person["country"] = request.form.get("country", "USA").strip() or "USA"
+    
+    # 4. Strip address to street only:
+    address = request.form.get("address", "").strip().upper()
+    if "," in address:
+        address = address.split(",")[0].strip()
+    person["address"] = address
+    
+    # 5. Map state_code from form field named "state_code"
+    person["state_code"] = request.form.get(
+        "state_code", "CA"
+    ).strip().upper()
+    
+    # 6. Map sex to numeric:
+    sex = request.form.get("sex", "M").strip().upper()
+    person["sex"] = "1" if sex == "M" else "2" if sex == "F" else "9"
+    
+    # Retrieve and clean other fields
     lic = str(request.form.get("license_number", "")).strip().upper()
     lic_clean = clean_license_number(lic)
-    last = str(request.form.get("last_name", "")).strip().upper()
-    first = str(request.form.get("first_name", "")).strip().upper()
+    person["license_number"] = lic
     
-    exp_yy = format_track_expiry(request.form.get("expiry_date", ""))
-    dob_yy = format_track_dob(request.form.get("dob", ""))
+    person["last_name"] = str(request.form.get("last_name", "")).strip().upper()
+    person["first_name"] = str(request.form.get("first_name", "")).strip().upper()
+    person["middle_name"] = str(request.form.get("middle_name", "")).strip().upper() or "NONE"
     
-    mag_track_1 = f"%{iin}{lic_clean}^{last}/{first}^{exp_yy}?"
-    mag_track_2 = f";{lic_clean}={exp_yy}{dob_yy}?"
+    person["dob"] = request.form.get("dob", "")
+    person["issue_date"] = request.form.get("issue_date", "")
+    person["expiry_date"] = request.form.get("expiry_date", "")
+    person["city"] = str(request.form.get("city", "")).strip().upper()
+    person["zip"] = str(request.form.get("zip", "")).strip().upper()
     
     h_feet = request.form.get("height_feet", "5")
     h_inches = request.form.get("height_inches", "11")
-    combined_height = f"{h_feet}'{h_inches}"
+    person["height_feet"] = h_feet
+    person["height_inches"] = h_inches
+    person["height"] = f"{h_feet}'{h_inches}"
     
-    # Sex handling (from form: 1/2/9)
-    sex_form = request.form.get("sex", "1")
+    person["eye_color"] = request.form.get("eye_color", "BRN").strip().upper()
+    person["hair_color"] = request.form.get("hair_color", "BLK").strip().upper()
+    person["category"] = request.form.get("category", "C").strip().upper()
+    person["restrictions"] = request.form.get("restrictions", "NONE").strip().upper()
+    person["endorsements"] = request.form.get("endorsements", "NONE").strip().upper()
     
-    # Handle read-only or auto-generated document discriminator
-    doc_disc = request.form.get("document_discriminator", "").strip()
-    if not doc_disc or doc_disc == "Auto-Generated on submit":
-        doc_disc = str(random.randint(1000000000, 9999999999))
+    # Read/generate sequence_number and revision_date
+    seq_num = request.form.get("sequence_number")
+    if not seq_num:
+        seq_num = str(random.randint(100000, 999999))
+    person["sequence_number"] = seq_num
     
-    data = {
-        "license_number": lic,
-        "last_name": last,
-        "first_name": first,
-        "middle_name": request.form.get("middle_name", ""),
-        "dob": request.form.get("dob", ""),
-        "issue_date": request.form.get("issue_date", ""),
-        "expiry_date": request.form.get("expiry_date", ""),
-        "address": request.form.get("address", ""),
-        "city": request.form.get("city", ""),
-        "county": request.form.get("county", ""),
-        "zip": request.form.get("zip", ""),
-        "sex": sex_form,
-        "height_feet": h_feet,
-        "height_inches": h_inches,
-        "height": combined_height,
-        "eye_color": request.form.get("eye_color", "BRN"),
-        "hair_color": request.form.get("hair_color", "BLK"),
-        "category": request.form.get("category", "C"),
-        "restrictions": request.form.get("restrictions", "NONE"),
-        "endorsements": request.form.get("endorsements", "NONE"),
-        "country": request.form.get("country", "USA"),
-        "sequence_number": seq_num,
-        "revision_date": rev_date,
-        "iin": iin,
-        "weight": request.form.get("weight", "160"),
-        "document_discriminator": doc_disc,
-        "magnetic_track_1": mag_track_1,
-        "magnetic_track_2": mag_track_2,
-        "magnetic_track": f"Track 1: {mag_track_1}\nTrack 2: {mag_track_2}"
-    }
+    rev_date = request.form.get("revision_date")
+    if not rev_date:
+        rev_date = date.today().strftime("%m/%d/%Y")
+    person["revision_date"] = rev_date
     
+    iin = request.form.get("iin", "").strip()
+    if not iin:
+        iin = "636014" if person["country"] == "USA" else "636055"
+    person["iin"] = iin
+    
+    person["weight"] = request.form.get("weight", "160").strip()
+    
+    # Calculate magnetic tracks
+    exp_yy = format_track_expiry(person["expiry_date"])
+    dob_yy = format_track_dob(person["dob"])
+    
+    mag_track_1 = f"%{iin}{lic_clean}^{person['last_name']}/{person['first_name']}^{exp_yy}?"
+    mag_track_2 = f";{lic_clean}={exp_yy}{dob_yy}?"
+    
+    person["magnetic_track_1"] = mag_track_1
+    person["magnetic_track_2"] = mag_track_2
+    person["magnetic_track"] = f"Track 1: {mag_track_1}\nTrack 2: {mag_track_2}"
+    
+    # Save outputs and render
+    data = person
     save_outputs_helper(data)
     
     return render_template("index.html", data=data, generated=True)

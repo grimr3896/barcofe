@@ -31,8 +31,8 @@
 
                     <!-- Issuer ID Number -->
                     <div class="form-group">
-                        <label for="iin">Issuer ID Number (IIN) *</label>
-                        <input type="text" id="iin" name="iin" required placeholder="636055" value="{{ data.iin if data else '636055' }}">
+                        <label for="iin">Issuer ID Number (IIN)</label>
+                        <input type="text" id="iin" name="iin" placeholder="636055" value="{{ data.iin if data else '636055' }}">
                     </div>
 
                     <!-- First Name -->
@@ -83,10 +83,61 @@
                         <input type="text" id="city" name="city" value="{{ data.city if data else '' }}">
                     </div>
 
-                    <!-- County -->
+                    <!-- State -->
                     <div class="form-group">
-                        <label for="county">County</label>
-                        <input type="text" id="county" name="county" value="{{ data.county if data else '' }}">
+                        <label for="state_code">State *</label>
+                        <select id="state_code" name="state_code">
+                            <option value="AL" {% if data and data.state_code == 'AL' %}selected{% endif %}>AL - Alabama</option>
+                            <option value="AK" {% if data and data.state_code == 'AK' %}selected{% endif %}>AK - Alaska</option>
+                            <option value="AZ" {% if data and data.state_code == 'AZ' %}selected{% endif %}>AZ - Arizona</option>
+                            <option value="AR" {% if data and data.state_code == 'AR' %}selected{% endif %}>AR - Arkansas</option>
+                            <option value="CA" {% if (data and data.state_code == 'CA') or (not data) %}selected{% endif %}>CA - California</option>
+                            <option value="CO" {% if data and data.state_code == 'CO' %}selected{% endif %}>CO - Colorado</option>
+                            <option value="CT" {% if data and data.state_code == 'CT' %}selected{% endif %}>CT - Connecticut</option>
+                            <option value="DE" {% if data and data.state_code == 'DE' %}selected{% endif %}>DE - Delaware</option>
+                            <option value="FL" {% if data and data.state_code == 'FL' %}selected{% endif %}>FL - Florida</option>
+                            <option value="GA" {% if data and data.state_code == 'GA' %}selected{% endif %}>GA - Georgia</option>
+                            <option value="HI" {% if data and data.state_code == 'HI' %}selected{% endif %}>HI - Hawaii</option>
+                            <option value="ID" {% if data and data.state_code == 'ID' %}selected{% endif %}>ID - Idaho</option>
+                            <option value="IL" {% if data and data.state_code == 'IL' %}selected{% endif %}>IL - Illinois</option>
+                            <option value="IN" {% if data and data.state_code == 'IN' %}selected{% endif %}>IN - Indiana</option>
+                            <option value="IA" {% if data and data.state_code == 'IA' %}selected{% endif %}>IA - Iowa</option>
+                            <option value="KS" {% if data and data.state_code == 'KS' %}selected{% endif %}>KS - Kansas</option>
+                            <option value="KY" {% if data and data.state_code == 'KY' %}selected{% endif %}>KY - Kentucky</option>
+                            <option value="LA" {% if data and data.state_code == 'LA' %}selected{% endif %}>LA - Louisiana</option>
+                            <option value="ME" {% if data and data.state_code == 'ME' %}selected{% endif %}>ME - Maine</option>
+                            <option value="MD" {% if data and data.state_code == 'MD' %}selected{% endif %}>MD - Maryland</option>
+                            <option value="MA" {% if data and data.state_code == 'MA' %}selected{% endif %}>MA - Massachusetts</option>
+                            <option value="MI" {% if data and data.state_code == 'MI' %}selected{% endif %}>MI - Michigan</option>
+                            <option value="MN" {% if data and data.state_code == 'MN' %}selected{% endif %}>MN - Minnesota</option>
+                            <option value="MS" {% if data and data.state_code == 'MS' %}selected{% endif %}>MS - Mississippi</option>
+                            <option value="MO" {% if data and data.state_code == 'MO' %}selected{% endif %}>MO - Missouri</option>
+                            <option value="MT" {% if data and data.state_code == 'MT' %}selected{% endif %}>MT - Montana</option>
+                            <option value="NE" {% if data and data.state_code == 'NE' %}selected{% endif %}>NE - Nebraska</option>
+                            <option value="NV" {% if data and data.state_code == 'NV' %}selected{% endif %}>NV - Nevada</option>
+                            <option value="NH" {% if data and data.state_code == 'NH' %}selected{% endif %}>NH - New Hampshire</option>
+                            <option value="NJ" {% if data and data.state_code == 'NJ' %}selected{% endif %}>NJ - New Jersey</option>
+                            <option value="NM" {% if data and data.state_code == 'NM' %}selected{% endif %}>NM - New Mexico</option>
+                            <option value="NY" {% if data and data.state_code == 'NY' %}selected{% endif %}>NY - New York</option>
+                            <option value="NC" {% if data and data.state_code == 'NC' %}selected{% endif %}>NC - North Carolina</option>
+                            <option value="ND" {% if data and data.state_code == 'ND' %}selected{% endif %}>ND - North Dakota</option>
+                            <option value="OH" {% if data and data.state_code == 'OH' %}selected{% endif %}>OH - Ohio</option>
+                            <option value="OK" {% if data and data.state_code == 'OK' %}selected{% endif %}>OK - Oklahoma</option>
+                            <option value="OR" {% if data and data.state_code == 'OR' %}selected{% endif %}>OR - Oregon</option>
+                            <option value="PA" {% if data and data.state_code == 'PA' %}selected{% endif %}>PA - Pennsylvania</option>
+                            <option value="RI" {% if data and data.state_code == 'RI' %}selected{% endif %}>RI - Rhode Island</option>
+                            <option value="SC" {% if data and data.state_code == 'SC' %}selected{% endif %}>SC - South Carolina</option>
+                            <option value="SD" {% if data and data.state_code == 'SD' %}selected{% endif %}>SD - South Dakota</option>
+                            <option value="TN" {% if data and data.state_code == 'TN' %}selected{% endif %}>TN - Tennessee</option>
+                            <option value="TX" {% if data and data.state_code == 'TX' %}selected{% endif %}>TX - Texas</option>
+                            <option value="UT" {% if data and data.state_code == 'UT' %}selected{% endif %}>UT - Utah</option>
+                            <option value="VT" {% if data and data.state_code == 'VT' %}selected{% endif %}>VT - Vermont</option>
+                            <option value="VA" {% if data and data.state_code == 'VA' %}selected{% endif %}>VA - Virginia</option>
+                            <option value="WA" {% if data and data.state_code == 'WA' %}selected{% endif %}>WA - Washington</option>
+                            <option value="WV" {% if data and data.state_code == 'WV' %}selected{% endif %}>WV - West Virginia</option>
+                            <option value="WI" {% if data and data.state_code == 'WI' %}selected{% endif %}>WI - Wisconsin</option>
+                            <option value="WY" {% if data and data.state_code == 'WY' %}selected{% endif %}>WY - Wyoming</option>
+                        </select>
                     </div>
 
                     <!-- ZIP / Postal Code -->
@@ -98,8 +149,11 @@
                     <!-- Country -->
                     <div class="form-group">
                         <label for="country">Country</label>
-                        <input type="text" id="country" name="country" value="{{ data.country if data else (data.country or 'KENYA') }}">
+                        <input type="text" id="country" name="country" value="{{ data.country if data else 'USA' }}">
                     </div>
+
+                    <!-- Compliance Type -->
+                    <input type="hidden" id="compliance_type" name="compliance_type" value="{{ data.compliance_type if data else 'F' }}">
 
                     <!-- Sequence Number -->
                     <div class="form-group">
@@ -123,9 +177,8 @@
                     <div class="form-group">
                         <label for="sex">Sex</label>
                         <select id="sex" name="sex">
-                            <option value="1" {% if data and data.sex == '1' %}selected{% endif %}>Male</option>
-                            <option value="2" {% if data and data.sex == '2' %}selected{% endif %}>Female</option>
-                            <option value="9" {% if data and data.sex == '9' %}selected{% endif %}>Unknown</option>
+                            <option value="M" {% if data and (data.sex == 'M' or data.sex == '1') %}selected{% endif %}>Male</option>
+                            <option value="F" {% if data and (data.sex == 'F' or data.sex == '2') %}selected{% endif %}>Female</option>
                         </select>
                     </div>
 
@@ -150,7 +203,7 @@
                     <!-- Weight -->
                     <div class="form-group">
                         <label for="weight">Weight (lbs)</label>
-                        <input type="text" id="weight" name="weight" placeholder="160" value="{{ data.weight if (data and data.weight) else '' }}">
+                        <input type="text" id="weight" name="weight" placeholder="160 lbs" value="{{ data.weight if (data and data.weight) else '' }}">
                     </div>
 
                     <!-- Eye Color -->
