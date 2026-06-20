@@ -1,795 +1,574 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Barcode, 
   Printer, 
   Download, 
   RefreshCw, 
-  Sliders, 
-  Layers, 
   FileText,
-  Bookmark,
   ShieldCheck,
   CheckCircle2
 } from "lucide-react";
+
 // @ts-ignore
 import { PDF417 } from "pdf417-generator";
 // @ts-ignore
 import JsBarcode from "jsbarcode";
 
-// Exact Form Fields with defaults
+// US States Array (All 50 US States)
+const US_STATES = [
+  { code: "AL", name: "Alabama" },
+  { code: "AK", name: "Alaska" },
+  { code: "AZ", name: "Arizona" },
+  { code: "AR", name: "Arkansas" },
+  { code: "CA", name: "California" },
+  { code: "CO", name: "Colorado" },
+  { code: "CT", name: "Connecticut" },
+  { code: "DE", name: "Delaware" },
+  { code: "FL", name: "Florida" },
+  { code: "GA", name: "Georgia" },
+  { code: "HI", name: "Hawaii" },
+  { code: "ID", name: "Idaho" },
+  { code: "IL", name: "Illinois" },
+  { code: "IN", name: "Indiana" },
+  { code: "IA", name: "Iowa" },
+  { code: "KS", name: "Kansas" },
+  { code: "KY", name: "Kentucky" },
+  { code: "LA", name: "Louisiana" },
+  { code: "ME", name: "Maine" },
+  { code: "MD", name: "Maryland" },
+  { code: "MA", name: "Massachusetts" },
+  { code: "MI", name: "Michigan" },
+  { code: "MN", name: "Minnesota" },
+  { code: "MS", name: "Mississippi" },
+  { code: "MO", name: "Missouri" },
+  { code: "MT", name: "Montana" },
+  { code: "NE", name: "Nebraska" },
+  { code: "NV", name: "Nevada" },
+  { code: "NH", name: "New Hampshire" },
+  { code: "NJ", name: "New Jersey" },
+  { code: "NM", name: "New Mexico" },
+  { code: "NY", name: "New York" },
+  { code: "NC", name: "North Carolina" },
+  { code: "ND", name: "North Dakota" },
+  { code: "OH", name: "Ohio" },
+  { code: "OK", name: "Oklahoma" },
+  { code: "OR", name: "Oregon" },
+  { code: "PA", name: "Pennsylvania" },
+  { code: "RI", name: "Rhode Island" },
+  { code: "SC", name: "South Carolina" },
+  { code: "SD", name: "South Dakota" },
+  { code: "TN", name: "Tennessee" },
+  { code: "TX", name: "Texas" },
+  { code: "UT", name: "Utah" },
+  { code: "VT", name: "Vermont" },
+  { code: "VA", name: "Virginia" },
+  { code: "WA", name: "Washington" },
+  { code: "WV", name: "West Virginia" },
+  { code: "WI", name: "Wisconsin" },
+  { code: "WY", name: "Wyoming" }
+];
+
+// Initial form data aligning with the user's expected scan output
 const INITIAL_FORM_DATA = {
-  license_number: "DL-2024-00412",
-  last_name: "MWANGI",
-  first_name: "JOHN",
-  middle_name: "KAMAU",
-  dob: "1995-03-14",
-  issue_date: "2024-01-10",
-  expiry_date: "2026-12-31",
-  address: "123 UNIVERSITY ROAD",
-  city: "RUIRU",
-  county: "NAIROBI",
-  zip: "00233",
+  license_number: "T16700285",
+  last_name: "MAURY",
+  first_name: "JUSTIN",
+  middle_name: "WILLIAM",
+  dob: "1958-07-15",
+  issue_date: "2009-08-14",
+  expiry_date: "2017-08-14",
+  address: "17 FIRST STREET",
+  city: "STAUNTON",
+  state_code: "VA",
+  zip: "24401",
   sex: "M",
-  height: "5'11\"",
+  height_feet: "5",
+  height_inches: "11",
+  weight: "160",
+  iin: "636055",
   eye_color: "BRN",
   hair_color: "BLK",
-  category: "C",
+  vehicle_class: "C",
   restrictions: "NONE",
   endorsements: "NONE",
-  country: "KENYA",
-  sequence_number: "",
-  revision_date: "",
-  magnetic_track_1: "",
-  magnetic_track_2: "",
-  magnetic_track: ""
+  country: "USA",
+  document_discriminator: "1827364590",
 };
 
-const getMagneticTracks = (data: typeof INITIAL_FORM_DATA) => {
-  let countyUpper = (data.county || "CA").trim().toUpperCase();
-  let stCode = countyUpper.slice(0, 2);
-  if (!stCode || countyUpper === "NONE") {
-    stCode = "CA";
-  }
-  const lic = (data.license_number || "").trim().toUpperCase();
-  const last = (data.last_name || "").trim().toUpperCase();
-  const first = (data.first_name || "").trim().toUpperCase();
-  
-  const formatToYYMMDD = (dateStr: string) => {
-    if (!dateStr) return "000000";
-    const parts = dateStr.trim().split("-");
-    if (parts.length === 3 && parts[0].length === 4) {
-      const [year, month, day] = parts;
-      const shortYear = year.slice(-2);
-      return `${shortYear}${month}${day}`;
+function formatDateAAMVA(dateStr: string): string {
+  if (!dateStr || dateStr === 'NONE') return 'NONE';
+  const clean = dateStr.replace(/-/g, '').replace(/\//g, '');
+  if (clean.length === 8) {
+    if (clean.startsWith('19') || clean.startsWith('20')) {
+      const year = clean.slice(0, 4);
+      const month = clean.slice(4, 6);
+      const day = clean.slice(6, 8);
+      return month + day + year;
     }
-    return "000000";
-  };
-  
-  const expYY = formatToYYMMDD(data.expiry_date);
-  const dobYY = formatToYYMMDD(data.dob);
-  
-  const track1 = `%${stCode}${lic}^${last}/${first}^${expYY}?`;
-  const track2 = `;${lic}=${expYY}${dobYY}?`;
-  
-  return {
-    track1,
-    track2,
-    combined: `Track 1: ${track1}\nTrack 2: ${track2}`
-  };
-};
-
-const FIELD_ORDER = [
-  ["DAQ", "license_number"],
-  ["DCS", "last_name"],
-  ["DAC", "first_name"],
-  ["DAD", "middle_name"],
-  ["DBB", "dob"],
-  ["DBD", "issue_date"],
-  ["DBA", "expiry_date"],
-  ["DAG", "address"],
-  ["DAI", "city"],
-  ["DAJ", "county"],
-  ["DAK", "zip"],
-  ["DBC", "sex"],
-  ["DAU", "height"],
-  ["DAY", "eye_color"],
-  ["DAZ", "hair_color"],
-  ["DCA", "category"],
-  ["DCB", "restrictions"],
-  ["DCD", "endorsements"],
-  ["DCG", "country"],
-  ["DCT", "magnetic_track_1"],
-  ["DCU", "magnetic_track_2"],
-  ["DCM", "sequence_number"],
-  ["DCN", "revision_date"],
-] as const;
-
-const formatDateToMMDDYY = (dateStr: string): string => {
-  if (!dateStr || dateStr.trim().toLowerCase() === "none") return "NONE";
-  const parts = dateStr.trim().split("-");
-  if (parts.length === 3 && parts[0].length === 4) {
-    const [year, month, day] = parts;
-    const shortYear = year.slice(-2);
-    return `${month}/${day}/${shortYear}`;
+    return clean;
+  }
+  if (dateStr.includes('-')) {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const [year, month, day] = parts;
+      return month + day + year;
+    }
   }
   return dateStr;
-};
+}
 
-const formatDateToYYYYMMDD = (dateStr: string): string => {
-  if (!dateStr || dateStr.trim().toLowerCase() === "none") return "NONE";
-  const cleaned = dateStr.replace(/[\/-]/g, "").trim();
-  if (/^\d{8}$/.test(cleaned)) {
-    return cleaned;
+function formatDateMMDDYYYY(dateStr: string): string {
+  if (!dateStr || dateStr === 'NONE') return 'NONE';
+  const clean = dateStr.replace(/-/g, '').replace(/\//g, '');
+  if (clean.length === 8) {
+    if (clean.startsWith('19') || clean.startsWith('20')) {
+      const year = clean.slice(0, 4);
+      const month = clean.slice(4, 6);
+      const day = clean.slice(6, 8);
+      return `${month}/${day}/${year}`;
+    }
+    const month = clean.slice(0, 2);
+    const day = clean.slice(2, 4);
+    const year = clean.slice(4, 8);
+    return `${month}/${day}/${year}`;
   }
-  const parts = dateStr.trim().split(/[\/-]/);
-  if (parts.length === 3) {
-    if (parts[0].length === 4) {
+  if (dateStr.includes('-')) {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
       const [year, month, day] = parts;
-      return `${year}${month.padStart(2, "0")}${day.padStart(2, "0")}`;
-    } else if (parts[2].length === 4) {
-      const [p1, p2, year] = parts;
-      return `${year}${p1.padStart(2, "0")}${p2.padStart(2, "0")}`;
+      return `${month}/${day}/${year}`;
     }
   }
-  return cleaned.toUpperCase();
-};
+  return dateStr;
+}
 
-const cleanLicenseNumber = (license: string): string => {
-  return license.toUpperCase().replace(/[^A-Z0-9]/g, "");
-};
+function convertHeight(heightStr: string): string {
+  const match = heightStr.match(/(\d+)['\s](\d+)/);
+  if (match) {
+    const feet = parseInt(match[1]);
+    const inches = parseInt(match[2]);
+    const total = (feet * 12) + inches;
+    return String(total).padStart(3, '0') + ' IN';
+  }
+  if (heightStr.toUpperCase().includes('IN')) {
+    return heightStr.toUpperCase();
+  }
+  return heightStr;
+}
 
-const getF = (val: string) => (val || "NONE").trim().toUpperCase();
+function generateDocumentDiscriminator(): string {
+  return String(Math.floor(Math.random() * 9000000000) + 1000000000);
+}
 
-const getIIN = (country: string, state: string): string => {
-  const c = country.toUpperCase().trim();
-  if (c === "KENYA") return "990001";
-  if (c === "CANADA") return "300022";
-  return "636014";
-};
+function buildAAMVAString(person: any, signatureHash?: string) {
+  const iin = person.iin || '636055';
+  const header = `@\n\x1e\rANSI ${iin}0101DL00310322DL\n`;
+  
+  const sex = person.sex === 'M' ? '1' : 
+              person.sex === 'F' ? '2' : '9';
+  
+  const dcf = person.document_discriminator || generateDocumentDiscriminator();
+  
+  // Strip address to street only
+  let address = (person.address || '').toUpperCase();
+  if (address.includes(',')) {
+    address = address.split(',')[0].trim();
+  }
+
+  const fields = [
+    ['DAQ', person.license_number],
+    ['DCS', (person.last_name || '').toUpperCase()],
+    ['DAC', (person.first_name || '').toUpperCase()],
+    ['DAD', (person.middle_name || 'NONE').toUpperCase()],
+    ['DBB', formatDateAAMVA(person.dob)],
+    ['DBA', formatDateAAMVA(person.expiry_date)],
+    ['DBC', sex],
+    ['DAY', person.eye_color || 'BRN'],
+    ['DAU', convertHeight(person.height || "5'9")],
+    ['DAG', address],
+    ['DAI', (person.city || '').toUpperCase()],
+    ['DAJ', (person.state_code || 'CA').toUpperCase()],
+    ['DAK', person.zip || '00000'],
+    ['DCF', dcf],
+    ['DCG', 'USA'],
+    ['DCA', person.vehicle_class || 'C'],
+    ['DCB', person.restrictions || 'NONE'],
+    ['DCD', person.endorsements || 'NONE'],
+    ['DBD', formatDateAAMVA(person.issue_date)],
+    ['DAZ', person.hair_color || 'BLK'],
+    ['DAW', person.weight || '160'],
+    ['DDA', 'F'],
+  ];
+
+  if (signatureHash) {
+    fields.push(['DCK', signatureHash]);
+  }
+
+  const body = fields
+    .map(([code, value]) => `${code} ${value || 'NONE'}`)
+    .join('\n');
+
+  return {
+    encodedString: header + body,
+    fields,
+    dcf
+  };
+}
 
 export default function App() {
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
   const [isGenerated, setIsGenerated] = useState(false);
   const [generationTime, setGenerationTime] = useState("");
   const [encodedText, setEncodedText] = useState("");
-  
-  // Custom layout tweak parameters to mimic python render_image
-  const [aspectRatio, setAspectRatio] = useState(9); // Mathematically yields ~16 columns in standard PDF417 math
-  const [inkColor, setInkColor] = useState("#000000");
-  const [devicePixelRatio, setDevicePixelRatio] = useState(5); // high scale multiplier
+  const [encodedFields, setEncodedFields] = useState<[string, string][]>([]);
   const [isFlashing, setIsFlashing] = useState(false);
-  
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const printCanvasRef = useRef<HTMLCanvasElement>(null);
-  const code128CanvasRef = useRef<HTMLCanvasElement>(null);
-  const printCode128CanvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Feature 1 — Signature States
+  const [signatureData, setSignatureData] = useState<string | null>(null);
+  const [signatureName, setSignatureName] = useState<string>("");
+
+  // Signature change handler
+  const handleSignatureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setSignatureData(reader.result as string);
+        setSignatureName(file.name);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Field change handler
   const handleInputChange = (key: string, value: string) => {
-    setFormData((prev) => {
-      const updated = {
-        ...prev,
-        [key]: value,
-      };
-      const tracks = getMagneticTracks(updated);
-      return {
-        ...updated,
-        magnetic_track_1: tracks.track1,
-        magnetic_track_2: tracks.track2,
-        magnetic_track: tracks.combined,
-      };
-    });
+    setFormData((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
   };
 
-  // Form encoded text builder
-  const buildEncodedText = (data: typeof INITIAL_FORM_DATA) => {
-    // Validate and format values first
-    const iin = getIIN(data.country, data.county);
-    const version = "11";
-    const jversion = "00";
-    const numSubfiles = "01";
-    const subfileType = "DL";
-
-    // Build subfile elements
-    const elements: string[] = [];
-
-    // 1. License Number (8-18 chars, alphanumeric)
-    let lic = cleanLicenseNumber(data.license_number);
-    if (lic.length < 8) lic = lic.padEnd(8, "0");
-    if (lic.length > 18) lic = lic.slice(0, 18);
-    elements.push(`DAQ ${lic}`);
-
-    // 2. Name (Last, First, Middle) -> Rule 3
-    const last = getF(data.last_name);
-    const first = getF(data.first_name);
-    const mid = data.middle_name && data.middle_name.toUpperCase() !== "NONE" ? data.middle_name.trim().toUpperCase() : "";
-    const nameVal = `${last},${first},${mid}`;
-    elements.push(`DAA ${nameVal}`);
-
-    // 3. Date of Birth -> Rule 1
-    elements.push(`DBB ${formatDateToYYYYMMDD(data.dob)}`);
-
-    // 4. Issue Date -> Rule 1
-    elements.push(`DBD ${formatDateToYYYYMMDD(data.issue_date)}`);
-
-    // 5. Expiry Date -> Rule 1
-    elements.push(`DBA ${formatDateToYYYYMMDD(data.expiry_date)}`);
-
-    // 6. Address -> Rule 5
-    const street = getF(data.address);
-    const city = getF(data.city);
-    const state = getF(data.county);
-    const zip = getF(data.zip);
-    const addressVal = `${street},${city},${state},${zip}`;
-    elements.push(`DAG ${addressVal}`);
-
-    // 7. City
-    elements.push(`DAI ${city}`);
-
-    // 8. State/Province
-    elements.push(`DAJ ${state}`);
-
-    // 9. ZIP/Postal Code
-    elements.push(`DAK ${zip}`);
-
-    // 10. Sex (M/F)
-    let sexVal = getF(data.sex);
-    if (sexVal !== "M" && sexVal !== "F") sexVal = "M"; // Safe default
-    elements.push(`DBC ${sexVal}`);
-
-    // 11. Height
-    elements.push(`DAU ${getF(data.height)}`);
-
-    // 12. Eye Color
-    elements.push(`DAY ${getF(data.eye_color)}`);
-
-    // 13. Hair Color
-    elements.push(`DAZ ${getF(data.hair_color)}`);
-
-    // 14. Class -> Rule 7
-    let categoryRaw = getF(data.category);
-    let classCode = categoryRaw;
-    if (categoryRaw === "STUDENT") classCode = "C";
-    elements.push(`DCA ${classCode}`);
-
-    // 15. Restrictions -> Rule 8
-    let restrRaw = getF(data.restrictions);
-    let restrCode = restrRaw;
-    if (restrRaw === "NONE" || !restrRaw) restrCode = "NONE";
-    elements.push(`DCB ${restrCode}`);
-
-    // 16. Endorsements -> Rule 8
-    let endRaw = getF(data.endorsements);
-    let endCode = endRaw;
-    if (endRaw === "NONE" || !endRaw) endCode = "NONE";
-    elements.push(`DCD ${endCode}`);
-
-    // 17. Country
-    elements.push(`DCG ${getF(data.country)}`);
-
-    // 18. Magnetic Track 1
-    elements.push(`DCT ${data.magnetic_track_1 || ""}`);
-
-    // 19. Magnetic Track 2
-    elements.push(`DCU ${data.magnetic_track_2 || ""}`);
-
-    // 20. Sequence Number
-    elements.push(`DCM ${data.sequence_number || ""}`);
-
-    // 21. Revision Date
-    elements.push(`DCN ${data.revision_date || ""}`);
-
-    // Join elements with LF (\n) and terminate with Segment Terminator (CR \r)
-    const subfileData = `${subfileType}\r${elements.join("\n")}\n`;
-
-    // Calculate Length and Offset
-    const offsetStr = "0031";
-    const lengthStr = subfileData.length.toString().padStart(4, "0");
-
-    // Build complete string
-    const header = `@\n\u001e\rANSI ${iin}${version}${jversion}${numSubfiles}${subfileType}${offsetStr}${lengthStr}`;
-    
-    return `${header}${subfileData}`;
-  };
-
-  const getCategoryDesc = (code: string) => {
-    switch(code) {
-      case "A": return "Commercial Vehicle >26000 lbs";
-      case "B": return "Commercial Vehicle >26000 lbs single";
-      case "C": return "Vehicle w/GVWR <=26000 No M/C";
-      case "M": return "Motorcycle only";
-      case "A/M": return "Commercial + Motorcycle";
-      case "C/M": return "Class C + Motorcycle";
-      default: return getF(code);
-    }
-  };
-
-  const getEndorsementDesc = (code: string) => {
-    switch(code) {
-      case "NONE": return "None";
-      case "H": return "Hazardous Materials";
-      case "M": return "Motorcycle";
-      case "N": return "Tank Vehicle";
-      case "P": return "Passenger";
-      case "S": return "School Bus";
-      case "T": return "Double/Triple Trailers";
-      case "X": return "Tanker + Hazmat";
-      default: return getF(code);
-    }
-  };
-
-  const getRestrictionDesc = (code: string) => {
-    switch(code) {
-      case "NONE": return "None";
-      case "A": return "Military only";
-      case "B": return "Corrective lenses";
-      case "C": return "Mechanical aid";
-      case "D": return "Prosthetic aid";
-      case "E": return "No manual transmission";
-      case "F": return "Outside mirror required";
-      case "G": return "Daylight driving only";
-      default: return getF(code);
-    }
-  };
-
-  // Helper to draw the customized physical ID card-style layout
-  const drawLayoutToCanvas = (targetCanvas: HTMLCanvasElement, rawText: string, barcodeColor: string) => {
-    const tempCanvas = document.createElement("canvas");
-    try {
-      PDF417.draw(rawText, tempCanvas, aspectRatio, 5, devicePixelRatio, barcodeColor);
-    } catch (err) {
-      console.error("Temp canvas draw failed", err);
-      return;
-    }
-
-    targetCanvas.width = 1200;
-    targetCanvas.height = 600;
-    const ctx = targetCanvas.getContext("2d");
-    if (!ctx) return;
-
-    // Fill white background
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, 1200, 600);
-
-    // 1. Black Magnetic Stripe (Height 80px)
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(0, 0, 1200, 80);
-
-    // 2. Track Data Strings below magnetic stripe
-    ctx.fillStyle = "#333333";
-    ctx.font = "bold 15px monospace";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "top";
-    
-    const { track1, track2 } = getMagneticTracks(formData);
-    ctx.fillText(`Track 1: ${track1}`, 40, 100);
-    ctx.fillText(`Track 2: ${track2}`, 40, 125);
-
-    // 3. Divider line
-    ctx.strokeStyle = "#cccccc";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(40, 160);
-    ctx.lineTo(1160, 160);
-    ctx.stroke();
-
-    // 4. LHS Block: CLASS, RESTRICTIONS, ENDORSEMENTS
-    // Heading format
-    const drawMetaRow = (label: string, value: string, desc: string, x: number, y: number) => {
-      if (!ctx) return;
-      ctx.fillStyle = "#666666";
-      ctx.font = "normal 12px sans-serif";
-      ctx.fillText(label, x, y);
-      
-      ctx.fillStyle = "#111111";
-      ctx.font = "bold 14px sans-serif";
-      ctx.fillText(`${value} - ${desc}`, x, y + 20);
-    };
-
-    drawMetaRow("VEHICLE CLASS", getF(formData.category), getCategoryDesc(getF(formData.category)), 40, 190);
-    drawMetaRow("RESTRICTIONS", getF(formData.restrictions), getRestrictionDesc(getF(formData.restrictions)), 40, 250);
-    drawMetaRow("ENDORSEMENTS", getF(formData.endorsements), getEndorsementDesc(getF(formData.endorsements)), 40, 310);
-
-    // 5. Divider inside the LHS/RHS block
-    ctx.strokeStyle = "#e5e7eb";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(400, 180);
-    ctx.lineTo(400, 360);
-    ctx.stroke();
-
-    // 6. Draw PDF417 Barcode (Centered vertically/horizontally in RHS)
-    // Area for PDF417: x = 440 to 1100, y = 180 to 360
-    ctx.drawImage(tempCanvas, 440, 180, 640, 180);
-
-    // 7. Vertically-oriented Sequence Number along right edge of PDF417
-    ctx.save();
-    ctx.translate(1120, 270);
-    ctx.rotate(-Math.PI / 2);
-    ctx.fillStyle = "#333333";
-    ctx.font = "bold 18px monospace";
-    ctx.textBaseline = "middle";
-    ctx.textAlign = "center";
-    ctx.fillText(formData.sequence_number || "000000", 0, 0);
-    ctx.restore();
-
-    // 8. Bottom divider
-    ctx.strokeStyle = "#cccccc";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(40, 380);
-    ctx.lineTo(1160, 380);
-    ctx.stroke();
-
-    // 9. Code 128 Barcode Space
-    if (code128CanvasRef.current) {
-      // Draw centered Code128
-      ctx.drawImage(code128CanvasRef.current, 400, 410, 400, 120);
-    } else {
-      ctx.fillStyle = "#000000";
-      ctx.font = "bold 20px monospace";
-      ctx.textBaseline = "top";
-      ctx.textAlign = "center";
-      ctx.fillText(formData.license_number, 600, 480);
-    }
-
-    // 10. Card Design Revision Date at bottom right
-    ctx.fillStyle = "#666666";
-    ctx.font = "bold 14px sans-serif";
-    ctx.textAlign = "right";
-    ctx.textBaseline = "bottom";
-    ctx.fillText(`REV ${formData.revision_date || "10/2020"}`, 1160, 560);
-  };
-
-  // Barcode generator runner
+  // Standard trigger generation runner
   const triggerGeneration = () => {
     if (!formData.license_number || !formData.first_name || !formData.last_name || !formData.dob) {
-      alert("Please fill in all required fields marked with * (Licence Number, First Name, Last Name, Date of Birth)");
+      alert("Please fill in Licence Number, First Name, Last Name, and Date of Birth.");
       return;
     }
 
     setIsFlashing(true);
-    setTimeout(() => setIsFlashing(false), 300);
+    setTimeout(() => setIsFlashing(false), 200);
 
-    const rawText = buildEncodedText(formData);
-    setEncodedText(rawText);
+    const person = {
+      ...formData,
+      height: `${formData.height_feet}'${formData.height_inches}`
+    };
 
-    // Render onto preview canvas
-    if (canvasRef.current) {
-      drawLayoutToCanvas(canvasRef.current, rawText, inkColor);
+    // Use current or generate fresh discriminator
+    let dcf_val = formData.document_discriminator;
+    if (!dcf_val) {
+      dcf_val = generateDocumentDiscriminator();
+      setFormData(prev => ({ ...prev, document_discriminator: dcf_val }));
+      person.document_discriminator = dcf_val;
     }
 
-    // Render onto print-only high-resolution canvas with default black ink
-    if (printCanvasRef.current) {
-      drawLayoutToCanvas(printCanvasRef.current, rawText, "#000000");
-    }
+    const signature_filename_or_hash = signatureName ? signatureName : "SIG_DEFAULT";
+    const { encodedString, fields } = buildAAMVAString(person, signature_filename_or_hash);
+    setEncodedText(encodedString);
+    setEncodedFields(fields as [string, string][]);
+
+    // Draw barcodes client-side with native bundles
+    setTimeout(() => {
+      // PDF417
+      const canvas = document.getElementById('pdf417Canvas') as HTMLCanvasElement;
+      if (canvas && PDF417 && typeof PDF417.draw === 'function') {
+        const ctx = canvas.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        try {
+          PDF417.draw(encodedString, canvas, 3, 5);
+        } catch (err) {
+          console.error("PDF417 Draw Error", err);
+        }
+      }
+
+      // Code 128
+      const c128Canvas = document.getElementById('code128Canvas') as HTMLCanvasElement;
+      if (c128Canvas && JsBarcode) {
+        try {
+          JsBarcode('#code128Canvas', person.license_number, {
+            format: 'CODE128',
+            width: 2,
+            height: 60,
+            displayValue: true,
+            fontSize: 14,
+            background: "#ffffff",
+            lineColor: "#000000"
+          });
+        } catch (err) {
+          console.error("Code128 Draw Error", err);
+        }
+      }
+    }, 60);
 
     setIsGenerated(true);
     setGenerationTime(new Date().toLocaleTimeString());
-
-    // Generate Code 128
-    setTimeout(() => {
-      if (code128CanvasRef.current && formData.license_number) {
-        try {
-          JsBarcode(code128CanvasRef.current, formData.license_number, {
-            format: "CODE128",
-            width: 1.5,
-            height: 50,
-            displayValue: true,
-            fontSize: 12,
-            font: "monospace",
-            textMargin: 4,
-            background: "#ffffff",
-            lineColor: "#000000",
-            margin: 10,
-          });
-        } catch (e) {
-          console.error("Code128 draw failed", e);
-        }
-      }
-      if (printCode128CanvasRef.current && formData.license_number) {
-        try {
-          JsBarcode(printCode128CanvasRef.current, formData.license_number, {
-            format: "CODE128",
-            width: 2.5,
-            height: 80,
-            displayValue: true,
-            fontSize: 14,
-            font: "monospace",
-            textMargin: 6,
-            background: "#ffffff",
-            lineColor: "#000000",
-            margin: 15,
-          });
-        } catch (e) {
-          console.error("Print Code128 draw failed", e);
-        }
-      }
-    }, 50);
   };
 
-  // Trigger initial render + setup sequence/revision/track values on mount
+  // Generate automatically on initial load
   useEffect(() => {
-    const seqNum = Math.floor(100000 + Math.random() * 900000).toString();
-    const today = new Date();
-    const mm = String(today.getMonth() + 1).padStart(2, "0");
-    const dd = String(today.getDate()).padStart(2, "0");
-    const yyyy = today.getFullYear();
-    const revDate = `${mm}/${dd}/${yyyy}`;
-
-    setFormData((prev) => {
-      const updated = {
-        ...prev,
-        sequence_number: seqNum,
-        revision_date: revDate,
-      };
-      const tracks = getMagneticTracks(updated);
-      return {
-        ...updated,
-        magnetic_track_1: tracks.track1,
-        magnetic_track_2: tracks.track2,
-        magnetic_track: tracks.combined,
-      };
-    });
+    triggerGeneration();
   }, []);
 
+  // Sync barcode regeneration upon signature load/update
   useEffect(() => {
-    if (formData.sequence_number) {
+    if (isGenerated) {
       triggerGeneration();
     }
-  }, [aspectRatio, inkColor, devicePixelRatio, formData.sequence_number, formData.category, formData.restrictions, formData.endorsements]);
+  }, [signatureData, signatureName]);
 
-  // Code 128 rendering effect
-  useEffect(() => {
-    if (isGenerated && formData.license_number) {
-      if (code128CanvasRef.current) {
-        try {
-          JsBarcode(code128CanvasRef.current, formData.license_number, {
-            format: "CODE128",
-            width: 1.5,
-            height: 50,
-            displayValue: true,
-            fontSize: 12,
-            font: "monospace",
-            textMargin: 4,
-            background: "#ffffff",
-            lineColor: "#000000",
-            margin: 10,
-          });
-        } catch (e) {
-          console.error("Code128 useEffect draw failed", e);
-        }
-      }
-      if (printCode128CanvasRef.current) {
-        try {
-          JsBarcode(printCode128CanvasRef.current, formData.license_number, {
-            format: "CODE128",
-            width: 2.5,
-            height: 80,
-            displayValue: true,
-            fontSize: 14,
-            font: "monospace",
-            textMargin: 6,
-            background: "#ffffff",
-            lineColor: "#000000",
-            margin: 15,
-          });
-        } catch (e) {
-          console.error("Print Code128 useEffect draw failed", e);
-        }
-      }
+  const handleDownloadPDF417 = () => {
+    const canvas = document.getElementById('pdf417Canvas') as HTMLCanvasElement;
+    if (!canvas) return;
+    try {
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'pdf417.png';
+        a.click();
+      });
+    } catch (e) {
+      const dataUrl = canvas.toDataURL("image/png");
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = 'pdf417.png';
+      a.click();
     }
-  }, [isGenerated, formData.license_number]);
-
-  // Save/Download Action for PDF417
-  const handleDownloadPNG = () => {
-    if (!canvasRef.current) return;
-    const dataUrl = canvasRef.current.toDataURL("image/png");
-    const link = document.createElement("a");
-    link.href = dataUrl;
-    link.download = `pdf417_${formData.license_number || "barcode"}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
-  // Save/Download Action for Code 128
   const handleDownloadCode128 = () => {
-    if (!code128CanvasRef.current) return;
-    const dataUrl = code128CanvasRef.current.toDataURL("image/png");
-    const link = document.createElement("a");
-    link.href = dataUrl;
-    link.download = `code128_${formData.license_number || "barcode"}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const canvas = document.getElementById('code128Canvas') as HTMLCanvasElement;
+    if (!canvas) return;
+    try {
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'code128.png';
+        a.click();
+      });
+    } catch (e) {
+      const dataUrl = canvas.toDataURL("image/png");
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = 'code128.png';
+      a.click();
+    }
   };
 
   return (
-    <div id="root-container" className="flex flex-col min-h-screen bg-slate-100 text-[#191c1d] font-sans">
+    <div id="root-container" className="flex flex-col min-h-screen bg-slate-50 text-slate-900 font-sans antialiased">
       
       {/* Bento-style Header with Branding */}
-      <header className="bg-[#1a3a6b] text-white py-3 px-6 shadow-md flex justify-between items-center z-10 sticky top-0">
+      <header className="bg-slate-900 text-white py-3.5 px-6 shadow-sm flex justify-between items-center z-10 sticky top-0">
         <div className="flex items-center gap-3">
-          <svg className="w-8 h-8 text-white/90" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M3 5h2v14H3V5zm4 0h1v14H7V5zm3 0h2v14h-2V5zm4 0h1v14h-1V5zm3 0h2v14h-2V5zm4 0h1v14h-1V5zM3 5h22v14H3V5z" opacity=".3"></path>
+          <svg className="w-8 h-8 text-indigo-400" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M3 5h2v14H3V5zm4 0h1v14H7V5zm3 0h2v14h-2V5zm4 0h1v14h-1V5zm3 0h2v14h-2V5zm4 0h1v14h-1V5zM3 5h22v14H3V5z" opacity=".2"></path>
             <path d="M3 5h2v14H3V5zm4 0h1v14H7V5zm3 0h2v14h-2V5zm4 0h1v14h-1V5zm3 0h2v14h-2V5zm4 0h1v14h-1V5z"></path>
           </svg>
-          <h1 className="text-lg md:text-xl font-bold tracking-tight uppercase">PDF417 Barcode Generator</h1>
+          <h1 className="text-base md:text-lg font-extrabold tracking-wider uppercase">PDF417 & 128 Utility</h1>
         </div>
-        <div className="text-xs opacity-80 font-mono bg-[#122b50] px-3 py-1 rounded-full border border-white/10 flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          v2.4.0 High-Res Output
+        <div className="text-[10px] uppercase font-mono bg-indigo-950 text-indigo-300 px-3 py-1 rounded-full border border-indigo-900/50 flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
+          Pure Client-Side Encoder
         </div>
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 p-4 md:p-6 flex flex-col xl:flex-row gap-6 max-w-7xl mx-auto w-full">
+      <main className="flex-1 p-4 md:p-6 flex flex-col lg:flex-row gap-6 max-w-7xl mx-auto w-full">
         
         {/* LEFT COLUMN: Input form Styled in Bento block */}
-        <section className="xl:w-3/5 bg-white rounded-xl shadow-sm border border-slate-200 p-5 md:p-6 flex flex-col justify-between">
+        <section className="lg:w-[58%] bg-white rounded-xl shadow-sm border border-slate-200/80 p-5 md:p-6 flex flex-col justify-between">
           <div>
-            <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
-              <FileText className="w-4 h-4 text-[#1a3a6b]" />
-              <h2 className="text-[#1a3a6b] font-bold text-sm uppercase tracking-wider">Information Input</h2>
+            <div className="flex items-center gap-2 mb-4 pb-2.5 border-b border-slate-100">
+              <FileText className="w-4 h-4 text-indigo-600" />
+              <h2 className="text-slate-800 font-bold text-xs uppercase tracking-widest">Metadata Values</h2>
             </div>
 
-            <form className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3.5 text-xs" onSubmit={(e) => e.preventDefault()}>
+            <form className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3" onSubmit={(e) => e.preventDefault()}>
               
+              {/* Issuer ID Number */}
+              <div className="flex flex-col gap-1 md:col-span-2">
+                <label className="font-semibold text-slate-500 text-[10px] uppercase tracking-wider">Issuer ID Number (IIN) *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="636055"
+                  value={formData.iin}
+                  onChange={(e) => handleInputChange("iin", e.target.value)}
+                  className="border border-slate-200/80 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition-all text-xs font-medium text-slate-850"
+                />
+              </div>
+
               {/* Licence Number */}
               <div className="flex flex-col gap-1 md:col-span-2">
-                <label className="font-semibold text-slate-600">Licence Number *</label>
+                <label className="font-semibold text-slate-500 text-[10px] uppercase tracking-wider">Licence Number *</label>
                 <input
                   type="text"
                   required
                   placeholder="DL-XXXX-XXXX"
                   value={formData.license_number}
                   onChange={(e) => handleInputChange("license_number", e.target.value)}
-                  className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800"
+                  className="border border-slate-200/80 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition-all text-xs font-medium text-slate-850"
                 />
               </div>
 
               {/* First & Last Name */}
               <div className="flex flex-col gap-1">
-                <label className="font-semibold text-slate-600">First Name *</label>
+                <label className="font-semibold text-slate-500 text-[10px] uppercase tracking-wider">First Name *</label>
                 <input
                   type="text"
                   required
                   value={formData.first_name}
                   onChange={(e) => handleInputChange("first_name", e.target.value)}
-                  className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800"
+                  className="border border-slate-200/80 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition-all text-xs font-medium text-slate-850"
                 />
               </div>
 
               <div className="flex flex-col gap-1">
-                <label className="font-semibold text-slate-600">Last Name *</label>
+                <label className="font-semibold text-slate-500 text-[10px] uppercase tracking-wider">Last Name *</label>
                 <input
                   type="text"
                   required
                   value={formData.last_name}
                   onChange={(e) => handleInputChange("last_name", e.target.value)}
-                  className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800"
+                  className="border border-slate-200/80 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition-all text-xs font-medium text-slate-850"
                 />
               </div>
 
               {/* Middle Name & Date of Birth */}
               <div className="flex flex-col gap-1">
-                <label className="font-semibold text-slate-600">Middle Name</label>
+                <label className="font-semibold text-slate-500 text-[10px] uppercase tracking-wider">Middle Name</label>
                 <input
                   type="text"
                   value={formData.middle_name}
                   onChange={(e) => handleInputChange("middle_name", e.target.value)}
-                  className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800"
+                  className="border border-slate-200/80 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition-all text-xs font-medium text-slate-850"
                 />
               </div>
 
               <div className="flex flex-col gap-1">
-                <label className="font-semibold text-slate-600">Date of Birth *</label>
+                <label className="font-semibold text-slate-500 text-[10px] uppercase tracking-wider">Date of Birth *</label>
                 <input
                   type="date"
                   required
                   value={formData.dob}
                   onChange={(e) => handleInputChange("dob", e.target.value)}
-                  className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800 cursor-pointer"
+                  className="border border-slate-200/80 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition-all text-xs font-medium text-slate-850 cursor-pointer"
                 />
               </div>
 
               {/* Issue & Expiry Dates */}
               <div className="flex flex-col gap-1">
-                <label className="font-semibold text-slate-600">Issue Date</label>
+                <label className="font-semibold text-slate-500 text-[10px] uppercase tracking-wider">Issue Date</label>
                 <input
                   type="date"
                   value={formData.issue_date}
                   onChange={(e) => handleInputChange("issue_date", e.target.value)}
-                  className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800 cursor-pointer"
+                  className="border border-slate-200/80 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition-all text-xs font-medium text-slate-850 cursor-pointer"
                 />
               </div>
 
               <div className="flex flex-col gap-1">
-                <label className="font-semibold text-slate-600">Expiry Date</label>
+                <label className="font-semibold text-slate-500 text-[10px] uppercase tracking-wider">Expiry Date</label>
                 <input
                   type="date"
                   value={formData.expiry_date}
                   onChange={(e) => handleInputChange("expiry_date", e.target.value)}
-                  className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800 cursor-pointer"
+                  className="border border-slate-200/80 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition-all text-xs font-medium text-slate-850 cursor-pointer"
                 />
               </div>
 
               {/* Address */}
               <div className="flex flex-col gap-1 md:col-span-2">
-                <label className="font-semibold text-slate-600">Address</label>
+                <label className="font-semibold text-slate-500 text-[10px] uppercase tracking-wider">Address (Street only is extracted)</label>
                 <input
                   type="text"
                   placeholder="Street Address, P.O. Box"
                   value={formData.address}
                   onChange={(e) => handleInputChange("address", e.target.value)}
-                  className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800"
+                  className="border border-slate-200/80 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition-all text-xs font-medium text-slate-850"
                 />
               </div>
 
-              {/* City & County */}
+              {/* City & US State Dropdown */}
               <div className="flex flex-col gap-1">
-                <label className="font-semibold text-slate-600">City</label>
+                <label className="font-semibold text-slate-500 text-[10px] uppercase tracking-wider">City</label>
                 <input
                   type="text"
                   value={formData.city}
                   onChange={(e) => handleInputChange("city", e.target.value)}
-                  className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800"
+                  className="border border-slate-200/80 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition-all text-xs font-medium text-slate-850"
                 />
               </div>
 
               <div className="flex flex-col gap-1">
-                <label className="font-semibold text-slate-600">County</label>
-                <input
-                  type="text"
-                  value={formData.county}
-                  onChange={(e) => handleInputChange("county", e.target.value)}
-                  className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800"
-                />
+                <label className="font-semibold text-slate-500 text-[10px] uppercase tracking-wider">US State Code *</label>
+                <select
+                  value={formData.state_code}
+                  onChange={(e) => handleInputChange("state_code", e.target.value)}
+                  className="border border-slate-200/80 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition-all text-xs font-medium text-slate-850 cursor-pointer"
+                >
+                  {US_STATES.map((st) => (
+                    <option key={st.code} value={st.code}>
+                      {st.name} ({st.code})
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              {/* ZIP Code & Sex */}
+              {/* ZIP Code & Sex Dropdown */}
               <div className="grid grid-cols-2 gap-2 md:col-span-1">
                 <div className="flex flex-col gap-1">
-                  <label className="font-semibold text-slate-600">ZIP Code</label>
+                  <label className="font-semibold text-slate-500 text-[10px] uppercase tracking-wider">ZIP Code</label>
                   <input
                     type="text"
                     value={formData.zip}
                     onChange={(e) => handleInputChange("zip", e.target.value)}
-                    className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800"
+                    className="border border-slate-200/80 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition-all text-xs font-medium text-slate-850"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="font-semibold text-slate-600">Sex</label>
+                  <label className="font-semibold text-slate-500 text-[10px] uppercase tracking-wider">Sex</label>
                   <select
                     value={formData.sex}
                     onChange={(e) => handleInputChange("sex", e.target.value)}
-                    className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800 cursor-pointer"
+                    className="border border-slate-200/80 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition-all text-xs font-medium text-slate-850 cursor-pointer"
                   >
-                    <option value="M">M</option>
-                    <option value="F">F</option>
+                    <option value="M">Male (M)</option>
+                    <option value="F">Female (F)</option>
                   </select>
                 </div>
               </div>
 
-              {/* Dimensions: Height, Eye, Hair */}
+              {/* Dimensions: Weight, Eye, Hair */}
               <div className="grid grid-cols-3 gap-2 md:col-span-1">
                 <div className="flex flex-col gap-1">
-                  <label className="font-semibold text-slate-600">Height</label>
+                  <label className="font-semibold text-slate-500 text-[10px] uppercase tracking-wider">Weight (lbs)</label>
                   <input
                     type="text"
-                    value={formData.height}
-                    onChange={(e) => handleInputChange("height", e.target.value)}
-                    className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800"
+                    placeholder="160"
+                    value={formData.weight}
+                    onChange={(e) => handleInputChange("weight", e.target.value)}
+                    className="border border-slate-200/80 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition-all text-xs font-medium text-slate-850"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="font-semibold text-slate-600">Eye</label>
+                  <label className="font-semibold text-slate-500 text-[10px] uppercase tracking-wider">Eye</label>
                   <select
                     value={formData.eye_color}
                     onChange={(e) => handleInputChange("eye_color", e.target.value)}
-                    className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800 cursor-pointer"
+                    className="border border-slate-200/80 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition-all text-xs font-medium text-slate-850 cursor-pointer"
                   >
                     <option value="BRN">BRN</option>
                     <option value="BLU">BLU</option>
@@ -799,11 +578,11 @@ export default function App() {
                   </select>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="font-semibold text-slate-600">Hair</label>
+                  <label className="font-semibold text-slate-500 text-[10px] uppercase tracking-wider">Hair</label>
                   <select
                     value={formData.hair_color}
                     onChange={(e) => handleInputChange("hair_color", e.target.value)}
-                    className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800 cursor-pointer"
+                    className="border border-slate-200/80 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition-all text-xs font-medium text-slate-850 cursor-pointer"
                   >
                     <option value="BLK">BLK</option>
                     <option value="BRN">BRN</option>
@@ -814,41 +593,57 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Vehicle Class (Category) */}
-              <div className="flex flex-col gap-1">
-                <label className="font-semibold text-slate-600">Vehicle Class</label>
-                <select
-                  value={formData.category}
-                  onChange={(e) => handleInputChange("category", e.target.value)}
-                  className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800 cursor-pointer"
-                >
-                  <option value="A">A - Commercial Vehicle &gt;26000 lbs</option>
-                  <option value="B">B - Commercial Vehicle &gt;26000 lbs single</option>
-                  <option value="C">C - Vehicle w/GVWR &le;26000 No M/C (default)</option>
-                  <option value="M">M - Motorcycle only</option>
-                  <option value="A/M">A/M - Commercial + Motorcycle</option>
-                  <option value="C/M">C/M - Class C + Motorcycle</option>
-                </select>
+              {/* Height dropdowns */}
+              <div className="grid grid-cols-2 gap-2 md:col-span-1">
+                <div className="flex flex-col gap-1">
+                  <label className="font-semibold text-slate-500 text-[10px] uppercase tracking-wider">Height (Feet)</label>
+                  <select
+                    value={formData.height_feet}
+                    onChange={(e) => handleInputChange("height_feet", e.target.value)}
+                    className="border border-slate-200/80 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition-all text-xs font-medium text-slate-850 cursor-pointer"
+                  >
+                    <option value="4">4 ft</option>
+                    <option value="5">5 ft</option>
+                    <option value="6">6 ft</option>
+                    <option value="7">7 ft</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-semibold text-slate-500 text-[10px] uppercase tracking-wider">Height (Inches)</label>
+                  <select
+                    value={formData.height_inches}
+                    onChange={(e) => handleInputChange("height_inches", e.target.value)}
+                    className="border border-slate-200/80 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition-all text-xs font-medium text-slate-850 cursor-pointer"
+                  >
+                    {[0,1,2,3,4,5,6,7,8,9,10,11].map(inch => (
+                      <option key={inch} value={inch}>{inch} in</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              {/* Country */}
-              <div className="flex flex-col gap-1">
-                <label className="font-semibold text-slate-600">Country</label>
-                <input
-                  type="text"
-                  value={formData.country}
-                  onChange={(e) => handleInputChange("country", e.target.value)}
-                  className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800"
-                />
+              {/* Vehicle Class (Category) */}
+              <div className="flex flex-col gap-1 md:col-span-1">
+                <label className="font-semibold text-slate-500 text-[10px] uppercase tracking-wider">Vehicle Class</label>
+                <select
+                  value={formData.vehicle_class}
+                  onChange={(e) => handleInputChange("vehicle_class", e.target.value)}
+                  className="border border-slate-200/80 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition-all text-xs font-medium text-slate-850 cursor-pointer"
+                >
+                  <option value="A">A - Commercial Vehicle (Class A)</option>
+                  <option value="B">B - Commercial Vehicle (Class B)</option>
+                  <option value="C">C - Standard Passenger (Class C)</option>
+                  <option value="M">M - Motorcycle Flag (Class M)</option>
+                </select>
               </div>
 
               {/* Restrictions */}
               <div className="flex flex-col gap-1 md:col-span-2">
-                <label className="font-semibold text-slate-600">Restrictions</label>
+                <label className="font-semibold text-slate-500 text-[10px] uppercase tracking-wider">Restrictions</label>
                 <select
                   value={formData.restrictions}
                   onChange={(e) => handleInputChange("restrictions", e.target.value)}
-                  className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800 cursor-pointer"
+                  className="border border-slate-200/80 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition-all text-xs font-medium text-slate-850 cursor-pointer"
                 >
                   <option value="NONE">None (default)</option>
                   <option value="A">A - Military only</option>
@@ -863,11 +658,11 @@ export default function App() {
 
               {/* Endorsements */}
               <div className="flex flex-col gap-1 md:col-span-2">
-                <label className="font-semibold text-slate-600">Endorsements</label>
+                <label className="font-semibold text-slate-500 text-[10px] uppercase tracking-wider">Endorsements</label>
                 <select
                   value={formData.endorsements}
                   onChange={(e) => handleInputChange("endorsements", e.target.value)}
-                  className="border border-slate-200 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1a3a6b] outline-none transition-all text-xs font-medium text-slate-800 cursor-pointer"
+                  className="border border-slate-200/80 p-2 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition-all text-xs font-medium text-slate-850 cursor-pointer"
                 >
                   <option value="NONE">None (default)</option>
                   <option value="H">H - Hazardous Materials</option>
@@ -880,45 +675,28 @@ export default function App() {
                 </select>
               </div>
 
-              {/* Read-only fields segment */}
-              <div className="grid grid-cols-2 gap-2 md:col-span-2 border-t border-slate-100 pt-3">
-                <div className="flex flex-col gap-1">
-                  <label className="font-semibold text-slate-400">Sequence Number (Auto)</label>
-                  <input
-                    type="text"
-                    readOnly
-                    value={formData.sequence_number}
-                    className="border border-slate-150 p-2 rounded-lg bg-slate-100 outline-none text-xs font-mono text-slate-500"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="font-semibold text-slate-400">Revision Date (Auto)</label>
-                  <input
-                    type="text"
-                    readOnly
-                    value={formData.revision_date}
-                    className="border border-slate-150 p-2 rounded-lg bg-slate-100 outline-none text-xs font-mono text-slate-500"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1 md:col-span-2">
-                <label className="font-semibold text-slate-400">Magnetic Track 1 Display (Auto)</label>
+              {/* Document Discriminator */}
+              <div className="flex flex-col gap-1 md:col-span-2 border-t border-slate-100 pt-3">
+                <label className="font-semibold text-slate-400 text-[10px] uppercase tracking-wider">Document Discriminator (DCF 10-Digit Auto / Manual)</label>
                 <input
                   type="text"
-                  readOnly
-                  value={formData.magnetic_track_1}
-                  className="border border-slate-150 p-2 rounded-lg bg-slate-100 outline-none text-xs font-mono text-slate-500"
+                  placeholder="Randomized 10-digit discriminator code"
+                  value={formData.document_discriminator}
+                  onChange={(e) => handleInputChange("document_discriminator", e.target.value)}
+                  className="border border-slate-200/80 p-2 rounded-lg bg-slate-100 outline-none text-xs font-mono text-slate-600 focus:bg-white"
                 />
               </div>
 
-              <div className="flex flex-col gap-1 md:col-span-2">
-                <label className="font-semibold text-slate-400">Magnetic Track 2 Display (Auto)</label>
+              {/* Signature Upload (Feature 1) */}
+              <div className="flex flex-col gap-1 md:col-span-2 border-t border-slate-100 pt-3">
+                <label className="font-semibold text-slate-500 text-[10px] uppercase tracking-wider" htmlFor="signatureUpload">Upload Signature Image</label>
                 <input
-                  type="text"
-                  readOnly
-                  value={formData.magnetic_track_2}
-                  className="border border-slate-150 p-2 rounded-lg bg-slate-100 outline-none text-xs font-mono text-slate-500"
+                  type="file"
+                  id="signatureUpload"
+                  accept="image/*"
+                  name="signature"
+                  onChange={handleSignatureChange}
+                  className="border border-slate-250 p-2 rounded-lg bg-slate-50 text-xs font-mono text-slate-600 outline-none file:mr-3 file:py-1 file:px-2.5 file:rounded-md file:border file:border-indigo-200 file:text-[10px] file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
                 />
               </div>
 
@@ -927,98 +705,181 @@ export default function App() {
 
           <button
             onClick={triggerGeneration}
-            className="mt-6 w-full bg-[#1a3a6b] text-white py-3 border border-[#1a3a6b] rounded-lg font-bold uppercase tracking-widest hover:bg-[#122b50] transition-all shadow-md hover:shadow-lg active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2.5 text-xs text-center"
+            className="mt-6 w-full bg-indigo-600 text-white py-3 border border-indigo-600 rounded-lg font-bold uppercase tracking-widest hover:bg-indigo-750 transition-all shadow-md hover:shadow-lg active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 text-xs text-center"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className="w-4 h-4 animate-spin-hover" />
             Generate Barcode
           </button>
         </section>
 
-        {/* RIGHT COLUMN: Stack of Bento bricks (Widgets) */}
-        <section className="xl:w-2/5 flex flex-col gap-6">
+        {/* RIGHT COLUMN: Live Previews + Decoded fields panel */}
+        <section className="lg:w-[42%] flex flex-col gap-6">
           
-          {/* Bento box 1: LIVE PREVIEW */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col items-stretch">
+          {/* Bento box 1: LIVE PREVIEW OF CANVASES */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200/80 p-5 flex flex-col items-stretch">
             <div className="flex items-center gap-2 mb-4 w-full border-b border-slate-100 pb-2">
-              <ShieldCheck className="w-4 h-4 text-[#1a3a6b]" />
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Live Preview</h3>
+              <ShieldCheck className="w-4 h-4 text-indigo-600" />
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest">Card Back Layout Preview</h3>
             </div>
             
-            <div className="flex flex-col gap-5">
-              {/* PDF417 Barcode */}
-              <div className="flex flex-col gap-1.5 items-start">
-                <span className="text-[11px] font-bold text-[#1a3a6b] uppercase tracking-wider">PDF417 Barcode (Full Data)</span>
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    id="barcode-preview-box"
-                    animate={{ 
-                      scale: isFlashing ? 1.02 : 1,
-                      borderColor: isFlashing ? "#1a3a6b" : "#f1f5f9"
-                    }}
-                    transition={{ duration: 0.15 }}
-                    className="w-full aspect-[3/1] bg-white border border-slate-200 p-3 flex items-center justify-center min-h-[140px] relative overflow-hidden rounded-lg"
-                  >
-                    {!isGenerated && (
-                      <div className="flex flex-col items-center opacity-40 text-center">
-                        <Barcode className="w-12 h-12 text-slate-400 mb-1" />
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#43474f]">Awaiting Generation...</p>
+            {/* Real CR80 Physical Card layout mockup */}
+            <AnimatePresence mode="wait">
+              <motion.div
+                id="barcode-preview-box"
+                animate={{ 
+                  scale: isFlashing ? 1.01 : 1,
+                  borderColor: isFlashing ? "rgb(79, 70, 229)" : "rgb(226, 232, 240)"
+                }}
+                transition={{ duration: 0.15 }}
+                className="relative w-full border border-slate-300 rounded-xl bg-white overflow-hidden shadow-md flex flex-col p-3 select-none"
+                style={{ minHeight: "410px" }}
+              >
+                {/* Feature 4 — State ghost watermark */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.08] z-0">
+                  {formData.state_code === "CA" ? (
+                    <svg viewBox="0 0 100 100" className="w-[180px] h-[180px] text-slate-800" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M 15,65 C 15,60 18,52 22,50 C 25,48 28,52 30,50 C 32,48 35,42 40,40 C 45,38 52,35 58,40 C 60,42 62,45 65,42 C 68,39 72,32 76,33 C 78,34 80,38 82,41 C 85,45 88,48 90,52 C 92,56 88,60 85,58 C 83,56 82,53 80,55 C 78,57 76,62 75,65 L 70,65 C 69,60 67,55 66,56 C 65,57 65,62 65,65 L 58,65 C 58,58 55,54 52,55 C 49,56 48,61 48,65 L 40,65 C 40,58 37,55 35,56 C 33,57 32,62 32,65 L 25,65 C 25,58 22,55 20,56 C 18,57 17,62 17,65 Z" />
+                      <polygon points="25,30 28,38 20,33 30,33 22,38" fill="currentColor" stroke="none" />
+                    </svg>
+                  ) : (
+                    <span className="text-[120px] font-extrabold text-slate-800 select-none uppercase font-mono tracking-widest">
+                      {formData.state_code || "VA"}
+                    </span>
+                  )}
+                </div>
+
+                {/* Main stack above watermark */}
+                <div className="relative z-10 flex flex-col justify-between h-full flex-1 gap-2.5">
+                  
+                  {/* Top segment: Feature 2 — Printed magnetic track string & solid black magnetic stripe */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex justify-between items-start">
+                      <div className="border border-slate-350 rounded px-1.5 py-0.5 bg-slate-50/95 font-mono text-[9px] font-bold text-slate-850 tracking-tighter leading-tight max-w-full overflow-x-hidden">
+                        <div>{`%${formData.state_code}DL-${formData.issue_date ? formData.issue_date.substring(0, 4) : '2009'}-${formData.document_discriminator ? formData.document_discriminator.slice(-5) : '18273'}^${(formData.last_name || '').toUpperCase()}/${(formData.first_name || '').toUpperCase()}^${formData.expiry_date ? formData.expiry_date.substring(2, 4) + formData.expiry_date.substring(5, 7) : '1708'}?`}</div>
+                        <div>{`;${formData.license_number || ''}=${formData.expiry_date ? formData.expiry_date.substring(2, 4) + formData.expiry_date.substring(5, 7) : '1708'}${formData.dob ? formData.dob.replace(/-/g, '').substring(4, 8) : '0715'}?`}</div>
                       </div>
-                    )}
+                    </div>
+                    {/* Magnetic stripe */}
+                    <div className="h-8 bg-slate-950 w-full rounded flex items-center justify-end px-3">
+                      <div className="w-1 h-full bg-slate-800 opacity-40"></div>
+                    </div>
+                  </div>
 
-                    <canvas 
-                      ref={canvasRef} 
-                      className={`max-w-full max-h-full object-contain ${!isGenerated ? "hidden" : "block"}`}
-                    />
-                  </motion.div>
-                </AnimatePresence>
-                <p className="text-[10px] text-slate-500 font-medium">Encodes all 19 fields — use for full verification</p>
-              </div>
-
-              {/* Code 128 Barcode */}
-              <div className="flex flex-col gap-1.5 items-start border-t border-slate-100 pt-4">
-                <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider font-sans">LICENCE NUMBER (Code 128)</span>
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    id="code128-preview-box"
-                    className="w-full bg-white border border-slate-200 p-3 flex items-center justify-center min-h-[100px] relative overflow-hidden rounded-lg"
-                  >
-                    {!isGenerated && (
-                      <div className="flex flex-col items-center opacity-40 text-center">
-                        <Barcode className="w-12 h-12 text-slate-400 mb-1" />
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#43474f]">Awaiting Generation...</p>
+                  {/* Middle row: Middle Left (Class info), Middle Right (PDF417 + sequence number) */}
+                  <div className="grid grid-cols-12 gap-2 items-center">
+                    {/* Middle left: Class codes */}
+                    <div className="col-span-4 bg-slate-50/85 backdrop-blur-[1px] border border-slate-150 p-1.5 rounded-md text-left font-mono text-[9px] leading-tight flex flex-col gap-1">
+                      <div>
+                        <span className="font-extrabold text-slate-400 block text-[8px] uppercase">CLASS</span>
+                        <span className="font-bold text-slate-900">{formData.vehicle_class || "C"}</span>
                       </div>
-                    )}
+                      <div>
+                        <span className="font-extrabold text-slate-400 block text-[8px] uppercase">REST</span>
+                        <span className="font-bold text-slate-900 truncate max-w-full block text-[8px]">{formData.restrictions || "NONE"}</span>
+                      </div>
+                      <div>
+                        <span className="font-extrabold text-slate-400 block text-[8px] uppercase">ENDO</span>
+                        <span className="font-bold text-slate-900 truncate max-w-full block text-[8px]">{formData.endorsements || "NONE"}</span>
+                      </div>
+                    </div>
 
-                    <canvas 
-                      ref={code128CanvasRef} 
-                      className={`max-w-[75%] max-h-full object-contain ${!isGenerated ? "hidden" : "block"}`}
-                    />
-                  </motion.div>
-                </AnimatePresence>
-                <p className="text-[10px] text-slate-500 font-medium font-sans">Encodes licence number only — use for quick lookup</p>
-              </div>
-            </div>
+                    {/* Middle right: PDF417 Canvas + sequence label */}
+                    <div className="col-span-8 flex flex-col items-end gap-0.5">
+                      <div className="w-full bg-white border border-slate-200 p-1 flex items-center justify-center min-h-[95px] relative rounded-md shadow-inner overflow-hidden">
+                        <canvas 
+                          id="pdf417Canvas"
+                          className="max-w-full max-h-[85px] object-contain"
+                        />
+                      </div>
+                      <div className="flex justify-between w-full px-0.5 text-[8px] font-mono text-slate-500 font-extrabold">
+                        <span>AAMVA 2D BARCODE</span>
+                        <span>SEQ 1042</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom row: Center (Code 128), Right (Rev date + Signature) */}
+                  <div className="grid grid-cols-12 gap-2 items-end pt-1 border-t border-slate-100">
+                    {/* Bottom center: Code 128 linear barcode */}
+                    <div className="col-span-8 flex flex-col items-center">
+                      <div className="w-full bg-white border border-slate-200 py-1 px-1.5 flex items-center justify-center min-h-[58px] relative rounded-md shadow-inner overflow-hidden">
+                        <canvas 
+                          id="code128Canvas"
+                          className="max-w-[95%] max-h-[50px] object-contain"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Bottom right: Rev date + Signature Image */}
+                    <div className="col-span-4 flex flex-col items-end justify-end gap-1 text-right">
+                      <div className="flex flex-col items-center w-full">
+                        {signatureData ? (
+                          <img src={signatureData} alt="Signature Preview" className="h-[28px] max-w-full object-contain mix-blend-multiply" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className="h-[28px] flex items-end justify-center text-[7px] text-slate-400 font-mono italic">Awaiting Sign</div>
+                        )}
+                        <div className="w-full border-t border-slate-350 text-[7px] text-slate-400 uppercase tracking-widest text-center mt-0.5 whitespace-nowrap scale-[0.85]">
+                          DL SIGNATURE
+                        </div>
+                      </div>
+                      <span className="text-[8px] font-bold font-mono text-slate-450 pr-0.5">
+                        {`REV ${formData.issue_date ? formData.issue_date.substring(5, 7) + '/' + formData.issue_date.substring(2, 4) : '08/09'}`}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Feature 3 — Bottom text: human readable text strip */}
+                  <div className="border-t border-dashed border-slate-200 pt-1.5 bg-slate-50/90 rounded-md">
+                    <div className="font-mono text-[9px] text-slate-600 leading-tight text-center select-all whitespace-pre-wrap">
+                      {`SEX ${formData.sex}  HAIR ${formData.hair_color || 'BLK'}  EYES ${formData.eye_color || 'BRN'}\n`}
+                      {`HGT ${formData.height_feet}'${formData.height_inches}"  WGT ${formData.weight || '160'} lb  ISS ${formatDateMMDDYYYY(formData.issue_date || 'NONE')}\n`}
+                      {`DD ${formData.document_discriminator || '0000000000'}  ISS ${formatDateMMDDYYYY(formData.issue_date || 'NONE')}`}
+                    </div>
+                  </div>
+
+                </div>
+              </motion.div>
+            </AnimatePresence>
 
             <div className="mt-4 pt-2 border-t border-slate-100 text-[10px] text-slate-400 font-mono tracking-wider uppercase flex justify-between w-full">
-              <span>Standard: PDF417 & 128</span>
-              <span>Cols: 16</span>
-              <span>ECL: Level 5</span>
+              <span>Card Back Mockup</span>
+              <span>Pure Client-Side Encoded</span>
             </div>
           </div>
 
+          {/* Digital Signature Result Section (Feature 1 requirement) */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200/80 p-5 flex flex-col gap-3">
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-2">Digital Signature</h3>
+            
+            {signatureData ? (
+              <div className="flex flex-col items-center gap-1 bg-slate-50 border border-slate-150 rounded-lg p-3">
+                <div className="border border-slate-200 rounded p-1 bg-white flex items-center justify-center h-16 w-full max-w-[200px]">
+                  <img src={signatureData} alt="Uploaded Digital Signature" className="max-h-full max-w-full object-contain mix-blend-multiply" referrerPolicy="no-referrer" />
+                </div>
+                <p className="text-[10px] text-slate-500 font-mono mt-1 text-center truncate max-w-full">
+                  File: <span className="font-semibold text-slate-700">{signatureName}</span>
+                </p>
+              </div>
+            ) : (
+              <div className="text-center py-4 bg-slate-50 border border-dashed border-slate-200 rounded-lg text-slate-400 text-xs italic">
+                No signature file uploaded. Placeholders are shown in active layout.
+              </div>
+            )}
+          </div>
+
           {/* Bento box 2: ACTIONS */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col gap-4">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Actions</h3>
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200/80 p-5 flex flex-col gap-4">
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-2">PNG Exports</h3>
             
             <div className="flex flex-col gap-2.5">
               <div className="flex flex-col sm:flex-row gap-2">
                 <button
-                  onClick={handleDownloadPNG}
+                  onClick={handleDownloadPDF417}
                   disabled={!isGenerated}
-                  className="flex-1 bg-[#1a3a6b] hover:bg-[#122b50] text-white rounded-lg flex items-center justify-center gap-2 font-semibold py-3 transition-colors text-xs cursor-pointer disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]"
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center justify-center gap-2 font-semibold py-3 transition-colors text-xs cursor-pointer disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]"
                 >
                   <Download className="w-4 h-4" />
-                  Download PDF417
+                  Save PDF417 PNG
                 </button>
                 
                 <button
@@ -1027,45 +888,54 @@ export default function App() {
                   className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center justify-center gap-2 font-semibold py-3 transition-colors text-xs cursor-pointer disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]"
                 >
                   <Download className="w-4 h-4" />
-                  Download Code 128
+                  Save Code 128 PNG
                 </button>
               </div>
-              
-              <button
-                onClick={() => window.print()}
-                disabled={!isGenerated}
-                className="w-full border-2 border-[#1a3a6b] text-[#1a3a6b] rounded-lg flex items-center justify-center gap-2 font-semibold py-3 transition-colors text-xs cursor-pointer hover:bg-[#1a3a6b]/5 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]"
-              >
-                <Printer className="w-4 h-4" />
-                Print Barcode
-              </button>
-            </div>
-
-            <div className="flex items-start gap-2.5 p-3.5 bg-slate-50 rounded-lg border border-slate-100 text-[#475f87]">
-              <Bookmark className="w-4 h-4 shrink-0 mt-0.5 text-[#1a3a6b]" />
-              <p className="text-[10px] leading-relaxed font-medium">
-                Complies with institutional physical scanning regulations. Suitable for direct high-contrast thermal badge and document paper printing.
-              </p>
             </div>
           </div>
 
+          {/* Bento box 3: VERIFICATION DISPLAY (WHAT SCANNER WILL READ) */}
+          <div className="bg-slate-900 rounded-xl shadow-md border border-slate-850 p-5 flex flex-col">
+            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-800 text-emerald-400">
+              <CheckCircle2 className="w-4 h-4 animate-pulse" />
+              <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-widest">What scanner will read</h3>
+            </div>
 
+            <div className="max-h-[300px] overflow-y-auto bg-slate-950 border border-slate-850 p-3.5 rounded-lg font-mono text-[11px] leading-relaxed text-slate-300">
+              {encodedFields.length > 0 ? (
+                <div className="space-y-1">
+                  {encodedFields.map(([code, val]) => (
+                    <div key={code} className="flex border-b border-slate-900/40 py-0.5 hover:bg-slate-900/30 transition-all">
+                      <span className="font-extrabold text-indigo-400 w-12 shrink-0">{code}</span>
+                      <span className="text-emerald-300 select-all">{val || 'NONE'}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-slate-500 italic uppercase tracking-wider text-center py-2">Awaiting payload generation...</p>
+              )}
+            </div>
 
-          {/* Bento box 4: RAW PAYLOAD METRICS */}
+            <div className="mt-3 text-[10px] text-slate-500 uppercase font-bold flex justify-between font-mono">
+              <span>Fields count: {encodedFields.length}</span>
+              <span>Timestamp: {generationTime}</span>
+            </div>
+          </div>
+
+          {/* Bento box 4: RAW INPUT PAYLOAD FOR CONSOLE COPIES */}
           {isGenerated && (
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col">
-              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-100 text-[#1a3a6b]">
-                <Layers className="w-4 h-4" />
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Raw Input Payload</h3>
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200/80 p-5 flex flex-col">
+              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-100 text-slate-700">
+                <Barcode className="w-4 h-4" />
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest">Raw Input Payload</h3>
               </div>
-              <div className="max-h-[120px] overflow-y-auto bg-slate-50 border border-slate-150 p-3 rounded-lg">
-                <pre className="font-mono text-[10px] text-slate-500 whitespace-pre-wrap leading-relaxed">
+              <div className="max-h-[140px] overflow-y-auto bg-slate-50 border border-slate-150 p-3 rounded-lg">
+                <pre className="font-mono text-[10px] text-slate-500 whitespace-pre-wrap leading-relaxed select-all">
                   {encodedText}
                 </pre>
               </div>
-              <div className="mt-2 text-[9px] text-slate-400 uppercase font-bold flex justify-between">
-                <span>Verified: Yes</span>
-                <span>Stamp: {generationTime}</span>
+              <div className="mt-2 text-[8px] text-slate-400 uppercase font-mono tracking-wider text-right">
+                Standards Compliant AAMVA File Format
               </div>
             </div>
           )}
@@ -1074,73 +944,15 @@ export default function App() {
       </main>
 
       {/* Bento-style footer */}
-      <footer className="bg-white border-t py-2.5 px-6 flex flex-col md:flex-row justify-between items-center text-[10px] text-slate-400 uppercase tracking-tighter gap-2">
+      <footer className="bg-white border-t py-3 px-6 flex flex-col md:flex-row justify-between items-center text-[10px] text-slate-400 uppercase tracking-tighter gap-2 mt-auto">
         <div className="font-mono flex items-center gap-1.5">
-          <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-          System Ready - Output: /output/barcode_test.png
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          Pure Client-Side Generation Connected
         </div>
         <div>
-          Dimensions: {isGenerated ? "3200 x 1060 px (High Density)" : "AWAITING PARAMS"}
+          Institutional Standard • PDF417 & CODE 128
         </div>
       </footer>
-
-      {/* Hidden high-res print document element */}
-      <div id="print-container" style={{ display: "none" }} className="p-8 bg-white">
-        <div className="flex flex-col items-center gap-6 max-w-[600px] bg-white p-10 text-center font-sans">
-          <div className="flex items-center gap-3">
-            <Barcode className="w-8 h-8 text-slate-800" />
-            <h2 className="text-xl font-bold uppercase tracking-tight text-slate-800">
-              Institutional Barcode Document
-            </h2>
-          </div>
-          <div className="text-xs text-slate-500 font-mono -mt-3">
-            SERIAL: {formData.license_number || "U-REC-EXPORT"} | DATE: {new Date().toLocaleDateString()}
-          </div>
-          
-          <div className="w-full flex flex-col gap-1 items-center">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">PDF417 Barcode (Full data)</span>
-            <div className="w-full aspect-[3/1] border border-gray-300 p-2 bg-white flex items-center justify-center">
-              <canvas ref={printCanvasRef} className="max-w-full max-h-full object-contain" />
-            </div>
-          </div>
-          
-          <div className="w-full flex flex-col gap-1 items-center mt-2">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Licence Number (Code 128)</span>
-            <div className="w-[80%] aspect-[4/1] border border-gray-300 p-2 bg-white flex items-center justify-center">
-              <canvas ref={printCode128CanvasRef} className="max-w-full max-h-full object-contain" />
-            </div>
-          </div>
-
-          <table className="w-full text-left font-mono text-[11px] text-slate-600 border-collapse border border-slate-200 mt-2">
-            <tbody>
-              <tr className="border-b border-slate-200 bg-slate-50">
-                <th className="p-2 border-r border-slate-200 w-2/5">FIELD PREFIX</th>
-                <th className="p-2">DATA DECODED VALUE</th>
-              </tr>
-              <tr className="border-b border-slate-200">
-                <td className="p-2 border-r border-slate-200 font-bold">DAQ (License)</td>
-                <td className="p-2">{formData.license_number}</td>
-              </tr>
-              <tr className="border-b border-slate-200">
-                <td className="p-2 border-r border-slate-200 font-bold">DCS (Last Name)</td>
-                <td className="p-2">{formData.last_name}</td>
-              </tr>
-              <tr className="border-b border-slate-200">
-                <td className="p-2 border-r border-slate-200 font-bold">DAC (First Name)</td>
-                <td className="p-2">{formData.first_name}</td>
-              </tr>
-              <tr>
-                <td className="p-2 border-r border-slate-200 font-bold">DBB (Dob)</td>
-                <td className="p-2">{formatDateToMMDDYY(formData.dob)}</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <div className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase mt-3">
-            VERIFIED SECURE DOCUMENT • END OF EXPORT RECORD
-          </div>
-        </div>
-      </div>
 
     </div>
   );
