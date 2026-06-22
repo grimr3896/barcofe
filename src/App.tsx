@@ -76,16 +76,16 @@ const US_STATES = [
 // Initial form data aligning with the user's expected scan output
 const INITIAL_FORM_DATA = {
   license_number: "T16700285",
-  last_name: "MAURY",
-  first_name: "JUSTIN",
-  middle_name: "WILLIAM",
-  dob: "1958-07-15",
-  issue_date: "2009-08-14",
-  expiry_date: "2017-08-14",
-  address: "17 FIRST STREET",
-  city: "STAUNTON",
-  state_code: "VA",
-  zip: "24401",
+  last_name: "SILVER",
+  first_name: "ALEX",
+  middle_name: "JAMES",
+  dob: "1998-07-15",
+  issue_date: "2017-08-14",
+  expiry_date: "2028-08-14",
+  address: "3001 S CHESTER AVE APT 2",
+  city: "BAKERSFIELD",
+  state_code: "CA",
+  zip: "93304",
   sex: "M",
   height_feet: "5",
   height_inches: "11",
@@ -113,11 +113,8 @@ function formatDateAAMVA(dateStr: string): string {
     return clean;
   }
   if (dateStr.includes('-')) {
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      const [year, month, day] = parts;
-      return month + day + year;
-    }
+    const [year, month, day] = dateStr.split('-');
+    return month + day + year;
   }
   return dateStr;
 }
@@ -186,55 +183,57 @@ function getAuditNumber(): string {
   return String(new Date().getFullYear()).slice(-2);
 }
 
+function generateTrack1(stateCode: string, licNum: string, lastName: string, firstName: string, expiryAAMVA: string): string {
+  const expMM = expiryAAMVA.slice(0, 2);
+  const expYY = expiryAAMVA.slice(6, 8);
+  const yymm = expYY + expMM;
+  const last = (lastName || '').toUpperCase();
+  const first = (firstName || '').toUpperCase();
+  return `%${stateCode}${licNum}^${last}/${first}^${yymm}?`;
+}
+
+function generateTrack2(licNum: string, expiryAAMVA: string, dobAAMVA: string): string {
+  const expMM = expiryAAMVA.slice(0, 2);
+  const expYY = expiryAAMVA.slice(6, 8);
+  const yymm = expYY + expMM;
+
+  const dobYY = dobAAMVA.slice(6, 8);
+  const dobMM = dobAAMVA.slice(0, 2);
+  const dobDD = dobAAMVA.slice(2, 4);
+  const yymmdd = dobYY + dobMM + dobDD;
+
+  return `;${licNum}=${yymm}${yymmdd}?`;
+}
+
 function generateTrackStrings(person: any) {
   const stateCode = (person.state_code || 'CA').toUpperCase();
   const licNum = person.license_number || '';
   const lastName = (person.last_name || '').toUpperCase();
   const firstName = (person.first_name || '').toUpperCase();
-  
-  // Get expiry YYMM from DBA field (MMDDYYYY)
-  let yymm = '';
-  const expiry = person.expiry_date || '';
-  if (expiry.length === 8) {
-    const mm = expiry.slice(0, 2);
-    const yy = expiry.slice(6, 8);
-    yymm = yy + mm;
-  } else if (expiry.includes('-')) {
-    const parts = expiry.split('-');
-    yymm = parts[0].slice(2) + parts[1];
-  }
 
-  // Get DOB YYMMDD from DBB field (MMDDYYYY)  
-  let dobYYMMDD = '';
-  const dob = person.dob || '';
-  if (dob.length === 8) {
-    const mm = dob.slice(0, 2);
-    const dd = dob.slice(2, 4);
-    const yy = dob.slice(6, 8);
-    dobYYMMDD = yy + mm + dd;
-  } else if (dob.includes('-')) {
-    const parts = dob.split('-');
-    dobYYMMDD = parts[0].slice(2) + parts[1] + parts[2];
-  }
+  const expiryAAMVA = formatDateAAMVA(person.expiry_date || '');
+  const dobAAMVA = formatDateAAMVA(person.dob || '');
 
-  const track1 = `%${stateCode}${licNum}^${lastName}/${firstName}^${yymm}?`;
-  const track2 = `;${licNum}=${yymm}${dobYYMMDD}?`;
-  
+  const track1 = generateTrack1(stateCode, licNum, lastName, firstName, expiryAAMVA);
+  const track2 = generateTrack2(licNum, expiryAAMVA, dobAAMVA);
+
   return { track1, track2 };
 }
 
-function convertHeight(heightStr: string): string {
-  const match = heightStr.match(/(\d+)['\s](\d+)/);
-  if (match) {
-    const feet = parseInt(match[1]);
-    const inches = parseInt(match[2]);
-    const total = (feet * 12) + inches;
-    return String(total).padStart(3, '0') + ' IN';
-  }
-  if (heightStr.toUpperCase().includes('IN')) {
-    return heightStr.toUpperCase();
-  }
-  return heightStr;
+function convertHeight(feet: string | number, inches: string | number) {
+  const ft = parseInt(String(feet)) || 0;
+  const ins = parseInt(String(inches)) || 0;
+  const totalInches = (ft * 12) + ins;
+  const aamva = String(totalInches).padStart(3, '0') + ' IN';
+  const display = `${ft}'${String(ins).padStart(2,'0')}"`;
+  return { aamva, display };
+}
+
+function encodeSex(sexValue: string): string {
+  const s = (sexValue || '').toUpperCase();
+  if (s === 'M' || s === 'MALE') return '1';
+  if (s === 'F' || s === 'FEMALE') return '2';
+  return '9';
 }
 
 function generateDocumentDiscriminator(): string {
@@ -245,8 +244,7 @@ function buildAAMVAString(person: any, signatureHash?: string) {
   const iin = person.iin || '636055';
   const header = `@\n\x1e\rANSI ${iin}0101DL00310322DL\n`;
   
-  const sex = person.sex === 'M' ? '1' : 
-              person.sex === 'F' ? '2' : '9';
+  const sex = encodeSex(person.sex);
   
   const dcf = person.document_discriminator || generateDocumentDiscriminator();
   
@@ -255,6 +253,8 @@ function buildAAMVAString(person: any, signatureHash?: string) {
   if (address.includes(',')) {
     address = address.split(',')[0].trim();
   }
+
+  const { aamva: heightAAMVA } = convertHeight(person.height_feet || "5", person.height_inches || "11");
 
   const fields = [
     ['DAQ', person.license_number],
@@ -265,7 +265,7 @@ function buildAAMVAString(person: any, signatureHash?: string) {
     ['DBA', formatDateAAMVA(person.expiry_date)],
     ['DBC', sex],
     ['DAY', person.eye_color || 'BRN'],
-    ['DAU', convertHeight(person.height || "5'9")],
+    ['DAU', heightAAMVA],
     ['DAG', address],
     ['DAI', (person.city || '').toUpperCase()],
     ['DAJ', (person.state_code || 'CA').toUpperCase()],
@@ -934,8 +934,8 @@ export default function App() {
 
                   {/* Feature 3 — Bottom text: human readable text strip with right spacing for Rev date */}
                   {(() => {
-                    const hgtVal = formatHeightDisplay(convertHeight(`${formData.height_feet || "5"}'${formData.height_inches || "11"}`));
-                    const sexVal = formatSexDisplay(formData.sex === 'M' ? '1' : '2');
+                    const hgtVal = convertHeight(formData.height_feet || "5", formData.height_inches || "11").display;
+                    const sexVal = (formData.sex || "M").toUpperCase();
                     const hairVal = formData.hair_color || 'BLK';
                     const eyeVal = formData.eye_color || 'BRN';
                     const wgtVal = formData.weight || '160';
